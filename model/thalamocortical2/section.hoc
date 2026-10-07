@@ -1,0 +1,489 @@
+/*----------------------------------------------------------------------------
+
+    Routines for building a section of the thalamus
+	================================================
+
+    Call createSec() to build a section. The input is
+    $s1 - the string representing the thalamic section type: first order - 
+          "FO" and higher order - "HO".
+
+    The excitatory TC input ratio onto inhibitory NRT cells is stored in
+    the scalar ratioTCNRT_*O
+
+    The inhibitory NRT input ratio onto excitatory TC is stored in the
+    scalar ratioNRTTC_*O
+
+    The inhibitory NRT input ratio back onto NRT cells is stored in the
+    scalar ratioNRTNRT_*O
+
+    For accessing local (located on a node) cell lists use cellLists_*O
+    object. cellLists_*O is a list of different cell type lists. Its
+    structure is as follows:
+        cellLists /cell lists/ ->
+            -> cells    /list of all cells on a node/
+            -> TCcells  /list of TC cells on a node/
+            -> NRTcells /list of NRT cells on a node/
+
+    To access local gid lists use nodeGidLists_*O object. nodeGidsLists_*O
+    is a list of different types of local gid lists corresponding to
+    different cell type lists in cellLists_*O. It has the following
+    structure:
+        nodeGidLists_*O /local gid lists/ ->
+            -> nodeGids
+            -> nodeTCgids
+            -> nodeNRTgids
+
+    Global (across all nodes) gids of the thalamus are located in
+    gidLists_*O object. Its structure is as follows:
+        gidLists_*O /global gid lists/ ->
+            -> gids
+            -> TCgids
+            -> NRTgids
+
+    The NRT cell type indices list is cellTypeInd_*O.
+
+    The netcons are stored in ncTCNRT_*O, ncNRTTC_*O, and ncNRTNRT_*O lists.
+    The structure of these lists is
+        ncTCNRT_*O /TC-to-NRT lists/ ->
+            -> syns AMPA+NMDA, no minis netcon list
+            -> minis in netcon list
+            -> minis out netcon list
+        ncNRTTC_*O /NRT-to-TC lists/ ->
+            -> syns GABAa+GABAb, no minis netcon list
+            -> minis in netcon list
+            -> minis out netcon list.
+
+    The delay and weight vectors for the netcons are stored in
+    delTCNRT_*O, delNRTTC_*O, delNRTNRT_*O, weiTCNRT_*O, weiNRTTC_*O, and
+    weiNRTNRT_*O.
+
+    Gap junctions exist in gapList_*O.
+
+    Written by Martynas Dervinis, Cardiff University, 2013-2015.
+
+----------------------------------------------------------------------------*/
+
+
+
+objref cellTypeInd, devRi, cells, TCcells, WAcells, WQcells, NRTcells, cellLists
+objref nodeGids, nodeTCgids, nodeWAgids, nodeWQgids, nodeNRTgids, nodeGidLists
+objref gids, TCgids, WAgids, WQgids, NRTgids, gidLists
+objref delTCNRT, delNRTTC, delNRTNRT, weiTCNRT, weiNRTTC, weiNRTNRT
+objref ncTCNRT, ncNRTTC, ncNRTNRT, ncNRTminisAMPAout, ncTCminisGABAaout, gapList
+objref ncSpike, tvec, idvec, nil
+objref cellLists_FO, nodeGidLists_FO, gidLists_FO, cellTypeInd_FO, ncTCNRT_FO, ncNRTTC_FO
+objref cellLists_HO, nodeGidLists_HO, gidLists_HO, cellTypeInd_HO, ncTCNRT_HO, ncNRTTC_HO
+objref delTCNRT_FO, delNRTTC_FO, delNRTNRT_FO, weiTCNRT_FO, weiNRTTC_FO, weiNRTNRT_FO
+objref delTCNRT_HO, delNRTTC_HO, delNRTNRT_HO, weiTCNRT_HO, weiNRTTC_HO, weiNRTNRT_HO
+objref gapList_FO, gapList_HO
+if (!(name_declared("gid"))) {
+    gid = 0
+}
+
+proc initParam() {local koefWei
+    strdef section
+    section = $s1
+    koefWei = 1
+    nTCgids = 100
+    nWAgids = 25
+    nWQgids = 25
+    nNRTgids = nWAgids + nWQgids
+    ngids = nTCgids + nNRTgids
+    ratioTCNRT = 0.10
+    ratioNRTTC = 0.10
+    ratioNRTNRT = 0.10
+    TCNRTfact = koefWei*10*0.044    // 0.052: 0.5mV //Upper limit is 15*0.052. Earlier model uses 10*0.044 (1.182 times smaller)
+    NRTTCfact = koefWei*2*0.3       // 0.3: ~-0.5 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -80 mV. Use 20*0.3 for sleep spindles and 2*0.3 for SWDs
+                                    // 1: ~-0.5 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -70 mV
+    NRTNRTfact = koefWei*0.4*0.2    // 0.2: 0.5mV. Earlier model uses 0.028 (6 times smaller)
+    delayTCNRT = 1                  // must be >0.6
+    delayNRTTC = 2.5                // must be >0.6
+    delayNRTNRT = 1                 // must be >0.6
+    P_release_Th = 0.8              // Synaptic release probability
+    synSpread_Th = 1                // Number of synapses formed between any two connecting neurons
+    gaps = 1                        // Gap junctions between NRT cells? 0 - no; 1 - yes.
+    gapr = 3000                     // The resistance of gap junctions (MOhms)
+}
+
+
+
+
+
+// ------------------------------------------------------------------------
+// Create models of single cells:
+// ------------------------------------------------------------------------
+
+proc initCells() {
+    cells = new List()
+    TCcells = new List()
+    WAcells = new List()
+    WQcells = new List()
+    NRTcells = new List()
+    cellLists = new List()
+    cellLists.append(cells)
+    cellLists.append(TCcells)
+    cellLists.append(WAcells)
+    cellLists.append(WQcells)
+    cellLists.append(NRTcells)
+    nodeGids = new Vector()
+    nodeTCgids = new Vector()
+    nodeWAgids = new Vector()
+    nodeWQgids = new Vector()
+    nodeNRTgids = new Vector()
+    nodeGidLists = new List()
+    nodeGidLists.append(nodeGids)
+    nodeGidLists.append(nodeTCgids)
+    nodeGidLists.append(nodeWAgids)
+    nodeGidLists.append(nodeWQgids)
+    nodeGidLists.append(nodeNRTgids)
+    gids = new Vector(ngids)
+    TCgids = new Vector(nTCgids)
+    WAgids = new Vector(nWAgids)
+    WQgids = new Vector(nWQgids)
+    NRTgids = new Vector(nNRTgids)
+    gidLists = new List()
+    gidLists.append(gids)
+    gidLists.append(TCgids)
+    gidLists.append(WAgids)
+    gidLists.append(WQgids)
+    gidLists.append(NRTgids)
+    startGid = gid
+}
+
+
+
+proc positionCells() {
+    if (pc.id == 0) {
+        if (randomise.x[0]) {
+            cellTypeInd = randExhaust(r, 0, nNRTgids-1)
+            randomInstance += 1
+            for i = cellTypeInd.size(), nNRTgids-1 {
+                cellTypeInd.append(i)
+            }
+        } else {
+            cellTypeInd = vecIncrement(0,1,nNRTgids-1)
+        }
+    } else {
+        cellTypeInd = new Vector()
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(cellTypeInd, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc riCells() {
+    devRi = new Vector(ngids)
+    if (pc.id == 0) {
+        if (randomise.x[1]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0, ngids-1 {
+                devRi.x[i] = normRepick(r)
+            }
+            randomInstance += 1
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(devRi, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc setRi() {  // $o1 - cell object; $2 - SD of Ri
+    if (randomise.x[1] == 1) {
+        x = normRepick(r)
+        $o1.soma.g_pas(0.5) = $o1.soma.g_pas(0.5) + $2*devRi.x[gid-startGid]
+    }
+}
+
+
+
+proc createMini() { // $o1 - a cell; $2 - number of AMPA synapses per cell; $3 - number of GABAAsynapses per cell.
+    if (randomise.x[4]) {
+        $o1.createMini("AMPA", $2)
+        $o1.createMini("GABAa", $3)
+    }
+}
+
+
+
+obfunc pickCell() {localobj cell
+    if (gid-startGid <= nTCgids-1) {
+        cell = new TCcell(gid, devRi.x[gid-startGid], section)
+        setRi(cell, 0.00000001)
+        TCcells.append(cell)
+        createMini(cell, 1, nNRTgids*ratioNRTTC*synSpread_Th*P_release_Th)
+        nodeTCgids.append(gid)
+    } else {
+        cell = new NRTcell(gid, devRi.x[gid-startGid], cellTypeInd.x[gid-nTCgids-startGid], section)
+        setRi(cell, 0.00000001)
+        NRTcells.append(cell)
+        converge_NRT = nTCgids*ratioTCNRT*synSpread_Th*P_release_Th
+        createMini(cell, converge_NRT, (nNRTgids*ratioNRTNRT-1)*synSpread_Th*P_release_Th)
+        nodeNRTgids.append(gid)
+        if (cellTypeInd.x[gid-nTCgids-startGid] <= 50/100*nNRTgids-1) {
+            WAcells.append(cell)
+            nodeWAgids.append(gid)
+        } else {
+            WQcells.append(cell)
+            nodeWQgids.append(gid)
+        }
+    }
+    return cell
+}
+
+
+
+proc instantiateCells() {local i, j  localobj cell, nc
+    tvec = new Vector()         // will be Vectors that record all spike times (tvec)
+    idvec = new Vector()        // and the corresponding id numbers of the cells that spiked (idvec)
+    ncSpike = new List()
+    if (pProc) {
+        for cellitr(&gid, pc) {
+            pc.set_gid2node(gid, pc.id)
+            cell = pickCell()
+            nc = cell.connect2target(nil, 1, 1)
+            pc.cell(gid, nc)
+            //pc.spike_record(gid, tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+        }
+    } else {
+        for gid = startGid, startGid+ngids-1 {
+            cell = pickCell()
+            nc = cell.connect2target(nil, 1, 1)
+            //nc.record(tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+        }
+    }
+
+    i = 0
+    j = 0
+    for gid = startGid, startGid+ngids-1 {
+        if (gid-startGid <= nTCgids-1) {
+            TCgids.x[gid-startGid] = gid
+        } else {
+            NRTgids.x[gid-startGid-nTCgids] = gid
+            if (cellTypeInd.x[gid-nTCgids-startGid] <= 50/100*nNRTgids-1) {
+                WAgids.x[i] = gid
+                i += 1
+            } else {
+                WQgids.x[j] = gid
+                j += 1
+            }
+        }
+        gids.x[gid-startGid] = gid
+    }
+}
+
+
+
+proc createCells() {
+    initCells()
+    positionCells()
+    riCells()
+    instantiateCells()
+}
+
+
+
+
+
+// ------------------------------------------------------------------------
+// Create the network:
+// ------------------------------------------------------------------------
+
+proc delNet() {local i, x     // Set the synaptic delays
+    delTCNRT = new Vector(round(nTCgids*ratioTCNRT*nNRTgids*synSpread_Th))
+    delNRTTC = new Vector(round(nNRTgids*ratioNRTTC*nTCgids*synSpread_Th))
+    if (ratioNRTNRT) { delNRTNRT = new Vector(round((nNRTgids*ratioNRTNRT-1)*nNRTgids*synSpread_Th)) }
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[2]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,delTCNRT.size()-1 {
+                x = normRepick(r)
+                delTCNRT.x[i] = testDel(delayTCNRT + 0.2*delayTCNRT*x, delayTCNRT)
+            }
+            for i = 0,delNRTTC.size()-1 {
+                x = normRepick(r)
+                delNRTTC.x[i] = testDel(delayNRTTC + 0.2*delayNRTTC*x, delayNRTTC)
+            }
+            if (ratioNRTNRT) {
+                for i = 0,delNRTNRT.size()-1 {
+                    x = normRepick(r)
+                    delNRTNRT.x[i] = testDel(delayNRTNRT + 0.2*delayNRTNRT*x, delayNRTNRT)
+                }
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,delTCNRT.size()-1 {
+                delTCNRT.x[i] = testDel(delayTCNRT, delayTCNRT)
+            }
+            for i = 0,delNRTTC.size()-1 {
+                delNRTTC.x[i] = testDel(delayNRTTC, delayNRTTC)
+            }
+            if (ratioNRTNRT) {
+                for i = 0,delNRTNRT.size()-1 {
+                    delNRTNRT.x[i] = testDel(delayNRTNRT, delayNRTNRT)
+                }
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(delTCNRT, 0)
+        pc.broadcast(delNRTTC, 0)
+        if (ratioNRTNRT) { pc.broadcast(delNRTNRT, 0) }
+        {pc.barrier()}
+    }
+}
+
+
+
+proc weiNet() {local i, x     // Set the synaptic weights
+    weiTCNRT = new Vector(round(nTCgids*ratioTCNRT*nNRTgids*synSpread_Th))
+    weiNRTTC = new Vector(round(nNRTgids*ratioNRTTC*nTCgids*synSpread_Th))
+    if (ratioNRTNRT) { weiNRTNRT = new Vector(round((nNRTgids*ratioNRTNRT-1)*nNRTgids*synSpread_Th)) }
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[3]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,weiTCNRT.size()-1 {
+                x = normRepick(r)
+                weiTCNRT.x[i] = testWei((1 + 0.05*x)*TCNRTfact)
+            }
+            for i = 0,weiNRTTC.size()-1 {
+                x = normRepick(r)
+                weiNRTTC.x[i] = testWei((1 + 0.05*x)*NRTTCfact)
+            }
+            if (ratioNRTNRT) {
+                for i = 0,weiNRTNRT.size()-1 {
+                    x = normRepick(r)
+                    weiNRTNRT.x[i] = testWei((1 + 0.05*x)*NRTNRTfact)
+                }
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,weiTCNRT.size()-1 {
+                weiTCNRT.x[i] = testWei(TCNRTfact)
+            }
+            for i = 0,weiNRTTC.size()-1 {
+                weiNRTTC.x[i] = testWei(NRTTCfact)
+            }
+            if (ratioNRTNRT) {
+                for i = 0,weiNRTNRT.size()-1 {
+                    weiNRTNRT.x[i] = testWei(NRTNRTfact)
+                }
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(weiTCNRT, 0)
+        pc.broadcast(weiNRTTC, 0)
+        if (ratioNRTNRT) { pc.broadcast(weiNRTNRT, 0) }
+        {pc.barrier()}
+    }
+}
+
+
+
+proc connectNet() {localobj amps
+    // Create TC-NRT AMPA and NMDA synapses and connect them to the source:
+    createSyns(NRTcells, nodeNRTgids, "GLU", P_release_Th, amps, pc)
+    ncTCNRT = connectSyns(TCcells, TCgids, NRTcells, NRTgids, ratioTCNRT, "GLU", delTCNRT, weiTCNRT, 1, pc, randomise.x[4], synSpread_Th, P_release_Th, amps, edge)
+    if (randomise.x[4]) {
+        weight = 0.021  // 0.021: ~0.2 mV @-65 mV and Ri = ~160 MOhms
+        ncNRTminisAMPAout = connectMinis(NRTcells, 0.6, weight, "GLU")
+        ncTCNRT.append(ncNRTminisAMPAout)
+    }
+
+    // Create NRT-TC GABAa and GABAb synapses and connect them to the source:
+    createSyns(TCcells, nodeTCgids, "GABAa", P_release_Th, amps, pc)
+    ncNRTTC = connectSyns(NRTcells, NRTgids, TCcells, TCgids, ratioNRTTC, "GABAfull", delNRTTC, weiNRTTC, 1, pc, randomise.x[4], synSpread_Th, P_release_Th, amps, edge)
+    if (randomise.x[4]) {
+        weight = 0.375  // 0.375: ~-0.2 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -70 mV
+        ncTCminisGABAaout = connectMinis(TCcells, 0.6, weight, "GABAa")
+        ncNRTTC.append(ncTCminisGABAaout)
+    }
+
+    // Create gap junctions:
+    if (gaps) {
+        if (!strcmp(section, "FO")) {
+            gapList = createGaps(gapr, NRTcells, nodeNRTgids, NRTgids, pc, edge, 0)
+        } else if (!strcmp(section, "HO")) {
+            gapList = createGaps(gapr, NRTcells, nodeNRTgids, NRTgids, pc, edge, nNRTgids)
+        }
+        varDt_local = 0
+    }
+}
+
+
+
+proc createNet() {
+    delNet()
+    weiNet()
+    connectNet()
+}
+
+
+
+proc setLists() {
+    if (!strcmp(section, "FO")) {
+        ratioTCNRT_FO = ratioTCNRT
+        ratioNRTTC_FO = ratioNRTTC
+        ratioNRTNRT_FO = ratioNRTNRT
+        cellLists_FO = cellLists
+        nodeGidLists_FO = nodeGidLists
+        gidLists_FO = gidLists
+        cellTypeInd_FO = cellTypeInd
+        ncTCNRT_FO = ncTCNRT
+        ncNRTTC_FO = ncNRTTC
+        delTCNRT_FO = delTCNRT
+        delNRTTC_FO = delNRTTC
+        delNRTNRT_FO = delNRTNRT
+        weiTCNRT_FO = weiTCNRT
+        weiNRTTC_FO = weiNRTTC
+        weiNRTNRT_FO = weiNRTNRT
+        gapList_FO = gapList
+    } else if (!strcmp(section, "HO")) {
+        ratioTCNRT_HO = ratioTCNRT
+        ratioNRTTC_HO = ratioNRTTC
+        ratioNRTNRT_HO = ratioNRTNRT
+        cellLists_HO = cellLists
+        nodeGidLists_HO = nodeGidLists
+        gidLists_HO = gidLists
+        cellTypeInd_HO = cellTypeInd
+        ncTCNRT_HO = ncTCNRT
+        ncNRTTC_HO = ncNRTTC
+        delTCNRT_HO = delTCNRT
+        delNRTTC_HO = delNRTTC
+        delNRTNRT_HO = delNRTNRT
+        weiTCNRT_HO = weiTCNRT
+        weiNRTTC_HO = weiNRTTC
+        weiNRTNRT_HO = weiNRTNRT
+        gapList_HO = gapList
+    }
+}
+
+
+
+proc createSec() {
+    initParam($s1)
+    createCells()
+    if (nTCgids > 0 && nNRTgids > 0) {
+        createNet()
+    }
+    setLists()
+}

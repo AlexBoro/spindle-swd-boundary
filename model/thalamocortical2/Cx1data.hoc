@@ -1,0 +1,220 @@
+/*  A class for handling recorded Cx cell data. Inputs:
+    $o1 - a Cx cell to be recorded;
+    $o2 - a voltage clamp object.
+
+    Contains a public procedure 'save' for saving the data. Inputs:
+    $s1 - the name (string) of the data file including its format extension
+          for saving simulation data. */
+
+begintemplate Cx1data
+public save, rect, recv, recIVC, reci
+external cvode
+
+objref cell, rect, recv, recvD, recIVC, reciS, reciD, recIleak, recINaS
+objref recINamS, recINahS, recINaD, recINamD, recINahD, recIKS, recIKn
+objref recIKD, recIMn, recCai, recICa, recIHVAm, recIHVAh, recIKCan
+
+proc init() {
+    dataVClamp = 1
+    dataNil = 1
+    dataExC = 1
+    dataIL = 1
+    dataINa = 1
+    dataIK = 1
+    dataIM = 1
+    dataICai = 1
+    dataIHVA = 1
+    dataIKCa = 1
+
+    vTstep = cvode.active()
+    rect = new Vector()                                                     // record time
+    cell = $o1
+
+    if (dataVClamp && object_id($o2,1) != -1) {                             // Voltage clamp
+        recIVC = new Vector()                                               // record voltage clamp current
+        if (vTstep) {
+            cvode.record(&$o2.i, recIVC, rect)
+        } else {
+            recIVC.record(&$o2.i)
+        }
+    }
+
+    if (dataNil) {                                                          // Basic data
+        recv = new Vector()                                                // record soma membrane potential
+        recvD = new Vector()                                                // record dend membrane potential
+        if (vTstep) {
+            access cell.soma
+            cvode.record(&cell.soma.v(0.5), recv, rect)
+            access cell.dend
+            cvode.record(&cell.dend.v(0.5), recvD, rect)
+        } else {
+            rect.record(&t)
+            access cell.soma
+            recv.record(&cell.soma.v(0.5))
+            access cell.dend
+            recvD.record(&cell.dend.v(0.5))
+        }
+    }
+
+    if (dataExC && !cvode.active()) {                                       // Basic data 2
+        reciS = new Vector()                                                // record total soma membrane current
+        reciD = new Vector()                                                // record total soma membrane current
+        if (vTstep) {
+            access cell.soma
+            cvode.record(&cell.soma.i_membrane(0.5), reciS, rect)
+            access cell.dend
+            cvode.record(&cell.dend.i_membrane(0.5), reciD, rect)
+        } else {
+            access cell.soma
+            reciS.record(&cell.soma.i_membrane(0.5))
+            access cell.dend
+            reciD.record(&cell.dend.i_membrane(0.5))
+        }
+    }
+
+    if (dataIL) {                                                           // Leak data
+        recIleak = new Vector()                                             // record dend leak current
+        access cell.dend
+        if (vTstep) {
+            cvode.record(&cell.dend.i_pas(0.5), recIleak, rect)
+        } else {
+            access cell.dend
+            recIleak.record(&cell.dend.i_pas(0.5))
+        }
+    }
+
+
+
+	if (dataINa) {                                                          // Fast I_Na current data
+    	recINaS = new Vector()                                              // record Na+ current @ soma
+        recINamS = new Vector()                                             // fast I_Na activation state @ soma
+        recINahS = new Vector()                                             // inactivation state @ soma
+        recINaD = new Vector()                                              // record Na+ current @ dend
+        recINamD = new Vector()                                             // fast I_Na activation state @ dend
+        recINahD = new Vector()                                             // inactivation state @ dend
+        if (vTstep) {
+        	access cell.soma
+            cvode.record(&cell.soma.ina(0.5), recINaS, rect)
+            cvode.record(&cell.soma.m_hhCx(0.5), recINamS, rect)
+            cvode.record(&cell.soma.h_hhCx(0.5), recINahS, rect)
+            access cell.dend
+            cvode.record(&cell.dend.ina(0.5), recINaD, rect)
+            cvode.record(&cell.dend.m_hhCx(0.5), recINamD, rect)
+            cvode.record(&cell.dend.h_hhCx(0.5), recINahD, rect)
+        } else {
+        	access cell.soma
+            recINaS.record(&cell.soma.ina(0.5))
+            recINamS.record(&cell.soma.m_hhCx(0.5))
+            recINahS.record(&cell.soma.h_hhCx(0.5))
+            access cell.dend
+            recINaD.record(&cell.dend.ina(0.5))
+            recINamD.record(&cell.dend.m_hhCx(0.5))
+            recINahD.record(&cell.dend.h_hhCx(0.5))
+        }
+    }
+
+
+
+    if (dataIK) {                                                           // I_K(DR) current data
+    	recIKS = new Vector()                                               // record K+ current @ soma
+        recIKn = new Vector()                                               // activation state
+        access cell.soma
+        if (vTstep) {
+        	cvode.record(&cell.soma.ik(0.5), recIKS, rect)
+            cvode.record(&cell.soma.n_hhCx(0.5), recIKn, rect)
+        } else {
+        	recIKS.record(&cell.soma.ik(0.5))
+            recIKn.record(&cell.soma.n_hhCx(0.5))
+        }
+    }
+
+    if (dataIM || dataIKCa) {                                               // Dendritic K+ current data
+        recIKD = new Vector()
+        access cell.dend
+        if (vTstep) {
+            cvode.record(&cell.dend.ik(0.5), recIKD, rect)
+        } else {
+            recIKD.record(&cell.dend.ik(0.5))
+        }
+
+        if (dataIM) {                                                       // I_M current data
+            recIMn = new Vector()                                           // record activation state
+            if (vTstep) {
+                cvode.record(&cell.dend.n_im(0.5), recIMn, rect)
+            } else {
+                recIMn.record(&cell.dend.n_im(0.5))
+            }
+        }
+
+        if (dataIKCa) {                                                     // I_K[Ca] current data
+            recIKCan = new Vector()                                         // record activation state
+            if (vTstep) {
+                cvode.record(&cell.dend.n_ikca(0.5), recIKCan, rect)
+            } else {
+                recIKCan.record(&cell.dend.n_ikca(0.5))
+            }
+        }
+    }
+
+
+
+    if (dataICai) {                                                         // [Ca2+]_i data
+        recCai = new Vector()                                               // record intracellular [Ca2+]
+        access cell.dend
+        if (vTstep) {
+            cvode.record(&cell.dend.cai(0.5), recCai, rect)
+        } else {
+            recCai.record(&cell.dend.cai(0.5))
+        }
+    
+    }
+
+    if (dataIHVA) {                                                         // I_HVA current data
+        recICa = new Vector()                                               // record Ca2+ current
+        recIHVAm = new Vector()                                             // I_HVA activation state
+        recIHVAh = new Vector()                                             // I_HVA inactivation state
+        access cell.dend
+        if (vTstep) {
+            cvode.record(&cell.dend.ica(0.5), recICa, rect)
+            cvode.record(&cell.dend.m_ihvaCx(0.5), recIHVAm, rect)
+            cvode.record(&cell.dend.h_ihvaCx(0.5), recIHVAh, rect)
+        } else {
+            recICa.record(&cell.dend.ica(0.5))
+            recIHVAm.record(&cell.dend.m_ihvaCx(0.5))
+            recIHVAh.record(&cell.dend.h_ihvaCx(0.5))
+        }
+    }
+}
+    
+proc save() {localobj savData, dataMatrix
+	savData = new File()
+    savData.wopen($s1)
+    dataMatrix = new Matrix()
+    dataMatrix.resize(22, rect.size())
+    if (object_id(rect,1) != -1)       { dataMatrix.setrow(0, rect) }
+    if (object_id(recv,1) != -1)       { dataMatrix.setrow(1, recv) }
+    if (object_id(recIVC,1) != -1)     { dataMatrix.setrow(2, recIVC) }
+    if (object_id(reciS,1) != -1)      { dataMatrix.setrow(3, reciS) }
+    if (object_id(recINaS,1) != -1)    { dataMatrix.setrow(4, recINaS) }
+    if (object_id(recINamS,1) != -1)   { dataMatrix.setrow(5, recINamS) }
+    if (object_id(recINahS,1) != -1)   { dataMatrix.setrow(6, recINahS) }
+    if (object_id(recIKS,1) != -1)     { dataMatrix.setrow(7, recIKS) }
+    if (object_id(recIKn,1) != -1)     { dataMatrix.setrow(8, recIKn) }
+    if (object_id(recvD,1) != -1)      { dataMatrix.setrow(9, recvD) }
+    if (object_id(reciD,1) != -1)      { dataMatrix.setrow(10, reciD) }
+    if (object_id(recIleak,1) != -1)   { dataMatrix.setrow(11, recIleak) }
+    if (object_id(recINaD,1) != -1)    { dataMatrix.setrow(12, recINaD) }
+    if (object_id(recINamD,1) != -1)   { dataMatrix.setrow(13, recINamD) }
+    if (object_id(recINahD,1) != -1)   { dataMatrix.setrow(14, recINahD) }
+    if (object_id(recIKD,1) != -1)     { dataMatrix.setrow(15, recIKD) }
+    if (object_id(recIMn,1) != -1)     { dataMatrix.setrow(16, recIMn) }
+    if (object_id(recCai,1) != -1)     { dataMatrix.setrow(17, recCai) }
+    if (object_id(recICa,1) != -1)     { dataMatrix.setrow(18, recICa) }
+    if (object_id(recIHVAm,1) != -1)   { dataMatrix.setrow(19, recIHVAm) }
+    if (object_id(recIHVAh,1) != -1)   { dataMatrix.setrow(20, recIHVAh) }
+    if (object_id(recIKCan,1) != -1)   { dataMatrix.setrow(21, recIKCan) }
+    dataMatrix.fprint(savData, "%g\t")
+    savData.close()
+}
+
+endtemplate Cx1data

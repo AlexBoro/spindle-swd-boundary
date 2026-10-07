@@ -1,0 +1,828 @@
+// Custom routines for exacuting simulations
+
+
+
+//  A procedure for running parallel simulations
+    proc prun() {
+        pc.set_maxstep(1e9)
+        pc.timeout(0)
+        {pc.barrier()}
+        stdinit()
+        {pc.barrier()}
+        pc.psolve(tstop)
+        {pc.barrier()}
+    }
+
+
+
+//  The procedure for running simulations.
+    proc runMain() {
+        if (varDt) { cvodeActive() }
+        if (cvode.active()) {
+            if (cvode.use_local_dt() && pc.id() == 0) {
+                print "using cell-local variable dt"
+            } else if (pc.id() == 0) {
+                print "using global variable dt"
+            }
+        } else if (pc.id() == 0) {
+            print "using fixed dt"
+        }
+        if (pProc) {
+            prun()
+        } else {
+            run()
+        }
+    }
+
+
+
+/*  A function to calculate the membrane area (cm^2) of a cell. Inputs:
+    $o1 - a cell. */
+    func membArea() {local A
+        A = PI*($o1.soma.L*1e-4)*($o1.soma.diam*1e-4) + 2*PI*(($o1.soma.diam/2)*1e-4)^2
+        return A    // cm^2
+    }
+
+
+
+/*  A function to determine the type of the cell. Inputs:
+    $o1 - the cell;
+    $2  - a logical for a short (0) or a long name (1).
+    Output is a scallar with values of 1 for TC and 2 for NRT. */
+    func cellString() {local cellType  localobj strobj
+        strobj = new StringFunctions()
+        strdef cellStr, cellStr1, cellStr2 
+        sprint(cellStr, "%s", $o1)
+        strobj.head(cellStr, "cell", cellStr1)
+        if (!strcmp(cellStr1, "TC")) {
+        	cellType = 1
+        } else if (!strcmp(cellStr1, "NRT")) {
+        	cellType = 2
+        } else if (!strcmp(cellStr1, "Cx1")) {
+            cellType = 3
+        } else if (!strcmp(cellStr1, "Cx2")) {
+            cellType = 4
+        } else if (!strcmp(cellStr1, "Cx3")) {
+            cellType = 5
+        }
+        if ($2) {
+            strobj.tail(cellStr, "cell", cellStr2)
+            strobj.right(cellStr2, 1)
+            strobj.head(cellStr2, "]", cellStr2)
+            sprint(cellStr, "%s_%s", cellStr1, cellStr2)
+        } else {
+            cellStr = cellStr1
+        }
+        return cellType
+    }
+
+
+/*  An object function for creating a list of voltage clamp objects that do
+    not clamp cells. The list is necessary for data recording. Input:
+    $o1 - a list of cells to be clamped.
+    Output is a list of voltage clamp objects corresponding to the cells in
+    the cell list. */
+    obfunc clampCells() {local i  localobj clamp, clampList
+        clampList = new List()
+        for i = 0, $o1.count()-1 {
+            clamp = vClamp($o1.o(i), 0, 0, 0, -65, -65, -65)
+            clampList.append(clamp)
+        }
+        return clampList
+    }
+
+
+
+/*  A procedure for running a single simulation of a single cell. Could be
+    used with a current clamp. Inputs:
+    $o1 - a cell to be recorded;
+    $2  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc singleRun() {local cellType  localobj clamp, dataCell
+        if ($2) {
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp, $2)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp, $2)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp, $2)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp, $2)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $2)
+            }
+            runMain()
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%sdata0.dat", saveData, cellStr)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%sdata0.dat", saveData, cellStr)
+            } else {
+                sprint(dataFile, "z%g_%sdata0.dat", saveData, cellStr)
+            }
+            dataCell.save(dataFile, saveData)
+        } else {
+            runMain()
+        }
+    }
+
+
+
+/*  A procedure for running multiple voltage clamp simulations in order to
+    systematically explore the parameter space. It is suitable for
+    obtaining the I-V curve. Inputs:
+    $o1  - a clamped cell;
+    $2   - the order of the voltage clamp stage to vary (1, 2, or 3);
+    $3   - starting value of the varying voltage step (mV);
+    $4   - limiting value of the varying voltage step (mV);
+    $5   - size of the varying voltage step (mV);
+    $6   - baseline voltage (mV);
+    $7   - holding potential (mV);
+    $8   - 1st clamp stage duration (ms);
+    $9   - 2nd clamp stage duration (ms);
+    $10  - 3rd clamp stage duration (ms);
+    $11  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc vClampLoop() {local i, whichVary, baseline, holding, cellType, vCommand  localobj clamp, dataCell
+        i = 0
+        whichVary = $2
+        baseline = $6
+        holding = $7
+        clamp = vClamp($o1, 0, 0, 0, 0, 0, 0)
+        if ($11) {
+            strdef dataFile
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp, $11)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp, $11)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp, $11)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp, $11)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $11)
+            }
+        }
+        for (vCommand = $3; vCommand <= $4; vCommand += $5) {
+            if (whichVary == 1) {
+                vClampAdj(clamp, $8, $9, $10, vCommand, baseline, holding)
+            } else if (whichVary == 2) {
+                vClampAdj(clamp, $8, $9, $10, holding, vCommand, baseline)
+            } else if (whichVary == 3) {
+                vClampAdj(clamp, $8, $9, $10, baseline, holding, vCommand)
+            }
+            runMain()
+            if ($11) {
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%g_%sdata%g.dat", saveData, cellStr, i)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%g_%sdata%g.dat", saveData, cellStr, i)
+                } else {
+                    sprint(dataFile, "z%g_%sdata%g.dat", saveData, cellStr, i)
+                }
+                dataCell.save(dataFile, $11)
+                //dataCell.saveIAHP(dataFile)
+            }
+            i += 1
+        }
+    }
+
+
+
+/*  A procedure for running multiple voltage clamp simulations in order to
+    systematically explore the parameter space. It is suitable for
+    obtaining the I-V curve. Inputs:
+    $o1 - a clamped cell;
+    $2  - the order of the voltage clamp stage to vary (1, 2, or 3);
+    $3  - 1st stage clamping value (mV);
+    $4  - 2nd stage clamping value (mV);
+    $5  - 3rd stage clamping value (mV);
+    $6  - Fixed stage duration (ms);
+    $7  - time step to increase the duration of the varying stage (ms);
+    $8  - number of runs;
+    $9  - a logical for saving data (see init.hoc). */
+    proc vClampLoopRec() {local i, whichVary, totDuration, tCommand, cellType  localobj clamp, dataCell
+        i = 0
+        whichVary = $2
+        totDuration = 2*$6 + $7*$8
+        clamp = vClamp($o1, 0, 0, 0, 0, 0, 0)
+        if ($9) {
+            strdef dataFile
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp, $9)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp, $9)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp, $9)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp, $9)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $9)
+            }
+        }
+        for (tCommand = $7; tCommand <= $7*$8; tCommand += $7) {
+            if (whichVary == 1) {
+                vClampAdj(clamp, tCommand, $6, totDuration-$6-tCommand, $3, $4, $5)
+            } else if (whichVary == 2) {
+                vClampAdj(clamp, $6, tCommand, totDuration-$6-tCommand, $3, $4, $5)
+            } else if (whichVary == 3) {
+                vClampAdj(clamp, $6, totDuration-$6-tCommand, tCommand, $3, $4, $5)
+            }
+            runMain()
+            if ($9) {
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%g_%sdata%g.dat", saveData, cellStr, i)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%g_%sdata%g.dat", saveData, cellStr, i)
+                } else {
+                    sprint(dataFile, "z%g_%sdata%g.dat", saveData, cellStr, i)
+                }
+                dataCell.save(dataFile, $9)
+            }
+            i += 1
+        }
+    }
+
+
+
+/*  A procedure for running multiple current clamp simulations in order to
+    estimate the R_i. Inputs:
+    $o1 - a clamped cell;
+    $2  - the initial value of the current step (nA);
+    $3  - the final value of the current step (nA);
+    $4  - current step increment size (nA);
+    $5  - holding current (nA);
+    $6  - the duration of a single current step (ms);
+    $7  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc stimLoop() {local i, iInj, iInjActual, iRange, cellType  localobj clamp, stim, dataCell
+        i = 0
+        stim = stimFamily($o1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        if ($7) {
+            strdef dataFile
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $7)
+            }
+        }
+        iRange = abs($3 - $2)
+        for (iInj = 0; iInj <= iRange; iInj += abs($4)) {
+            iInjActual = $2 + iInj*(($3 - $2)/iRange)
+            print iInjActual
+            stimFamilyAdj(stim,$6,$6,$6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,$5,$5+iInjActual,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+            runMain()
+            if ($7) {
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%g_%sdata%g.dat", saveData, cellStr, i)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%g_%sdata%g.dat", saveData, cellStr, i)
+                } else {
+                    sprint(dataFile, "z%g_%sdata%g.dat", saveData, cellStr, i)
+                }
+                dataCell.save(dataFile, $7)
+            }
+            i += 1
+        }
+    }
+
+
+
+/*  A procedure for running multiple 3-step current clamp simulations and
+    varying the first and the second steps. Inputs:
+    $o1 - a clamped cell;
+    $2  - the initial value of the current step (nA);
+    $3  - the final value of the current step (nA);
+    $4  - current step increment size (nA);
+    $5  - 2nd step current (nA);
+    $6  - the duration of a single current step (ms);
+    $7  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc stimLoop13() {local i, iInj, iInjActual, iRange, cellType  localobj clamp, stim, dataCell
+        i = 0
+        stim = stimFamily($o1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        if ($7) {
+            strdef dataFile
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp, $7)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp, $7)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp, $7)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp, $7)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $7)
+            }
+        }
+        iRange = abs($3 - $2)
+        for (iInj = 0; iInj <= iRange; iInj += abs($4)) {
+            iInjActual = $2 + iInj*(($3 - $2)/iRange)
+            //print iInjActual
+            stimFamilyAdj(stim,$6,$6,30e3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,iInjActual,$5,iInjActual,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+            runMain()
+            if ($7) {
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%1.5f_%sdata%g.dat", $o1.soma.gkbar1_iahp(0.5), cellStr, i)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%1.5f_%sdata%g.dat", $o1.soma.gkbar1_iahp(0.5), cellStr, i)
+                } else {
+                    sprint(dataFile, "z%1.5f_%sdata%g.dat", $o1.soma.gkbar1_iahp(0.5), cellStr, i)
+                }
+                dataCell.save(dataFile, $7)
+            }
+            i += 1
+        }
+    }
+
+
+
+/*  A procedure for running multiple delayed voltage clamp simulations.
+    Inputs:
+    $o1  - a clamped cell;
+    $2   - the order of the voltage clamp stage to vary (1, 2);
+    $3   - starting value of the varying voltage step (mV);
+    $4   - limiting value of the varying voltage step (mV);
+    $5   - size of the varying voltage step (mV);
+    $6   - baseline voltage (mV);
+    $7   - delay duration (ms);
+    $8   - 1st clamp stage duration (ms);
+    $9   - 2nd clamp stage duration (ms);
+    $10  - a logical for saving data (0 - no, 1 - yes (minimal), 2 - yes (full)). */
+    proc delClampLoop() {local i, vCommand  localobj clamp, dataCell
+        i = 0
+        whichVary = $2
+        baseline = $6
+        clamp = delClamp($o1, 0, 0, 0, 0, 0)
+        if ($10) {
+            strdef dataFile
+            cellType = cellString($o1, 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1, clamp, $10)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1, clamp, $10)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1, clamp, $10)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1, clamp, $10)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1, clamp, $10)
+            }
+        }
+        for (vCommand = $3; vCommand <= $4; vCommand += $5) {
+            if (whichVary == 1) {
+                delClampAdj(clamp, $7, $8, $9, vCommand, baseline)
+            } else if (whichVary == 2) {
+                delClampAdj(clamp, $7, $8, $9, baseline, vCommand)
+            }
+            runMain()
+            if ($10) {
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%g_%sdata%g.dat", saveData, cellStr, i)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%g_%sdata%g.dat", saveData, cellStr, i)
+                } else {
+                    sprint(dataFile, "z%g_%sdata%g.dat", saveData, cellStr, i)
+                }
+                dataCell.save(dataFile, $10)
+            }
+            i += 1
+        }
+    }
+
+
+
+/*  A procedure for estimating apparent input resistance. Inputs:
+    $o1 - a data object containing membrane potential vector;
+    $2  - the size of the current clamp step used in measuring Ri;
+    $3  - the duration of the first and the third voltage steps (ms);
+    $4  - the duration of the second voltage step (ms).*/
+    proc estRi() {local resting, baseline, iPeak, peak, amplitude, Ri  localobj tRest, tBase
+        tRest = new Vector()
+        tRest.copy($o1.rect)
+        tRest.sub($3)
+        tRest.abs()
+        iRest = tRest.min_ind() - 1
+        resting = $o1.recv.x[iRest]
+
+        tBase = new Vector()
+        tBase.copy($o1.rect)
+        tBase.sub($3+$4)
+        tBase.abs()
+        iBase = tBase.min_ind() - 1
+        baseline = $o1.recv.x[iBase]
+
+        iPeak = $o1.rect.size() - 1
+        peak = $o1.recv.x[iPeak]
+
+        amplitude = abs(peak - baseline)
+        Ri = amplitude/abs($2)
+
+        print "V1 = ", resting
+        print "V2 = ", baseline
+        print "V3 = ", peak
+        print "Apparent R_i = ", Ri
+    }
+
+
+
+/*  A procedure for running a single simulation of a single cell when
+    estimating apparent input resistance. It is supposed to be run with a
+    current clamp. Inputs:
+    $o1 - a cell to be recorded;
+    $2  - current step used (nA);
+    $3  - the duration of the first and the third voltage steps (ms);
+    $4  - the duration of the second voltage step (ms);
+    $5  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc singleRunRi() {local cellType  localobj clamp, dataCell
+        cellType = cellString($o1, 0)
+        if (cellType == 1) {
+        	dataCell = new TCdata($o1, clamp, $5)
+        } else if (cellType == 2) {
+        	dataCell = new NRTdata($o1, clamp, $5)
+        } else if (cellType == 3) {
+        	dataCell = new Cx1data($o1, clamp, $5)
+        } else if (cellType == 4) {
+        	dataCell = new Cx2data($o1, clamp, $5)
+        } else if (cellType == 5) {
+        	dataCell = new Cx3data($o1, clamp, $5)
+        }
+        runMain()
+        estRi(dataCell, $2, $3, $4)
+        if ($5) {
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%sdata0.dat", saveData, cellStr)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%sdata0.dat", saveData, cellStr)
+            } else {
+                sprint(dataFile, "z%g_%sdata0.dat", saveData, cellStr)
+            }
+            dataCell.save(dataFile, $5)
+        }
+    }
+
+
+
+/*  A procedure for the membrane time constant. Inputs:
+    $o1 - a data object containing membrane potential vector;
+    $2  - the size of the current clamp step used in measuring Ri;
+    $3  - the duration of the first and the third voltage steps (ms);
+    $4  - the duration of the second voltage step (ms).*/
+    proc estTau() {local i1, v1, i2, v2, iExp, vExp, tau1, tau2  localobj t1, t2, vMeasure
+        t1 = new Vector()
+        t1.copy($o1.rect)
+        t1.sub($2 + $3)
+        t1.abs()
+        i1 = t1.min_ind()
+        v1 = $o1.recv.x[i1-1]
+        t2 = new Vector()
+        t2.copy($o1.rect)
+        t2.sub(2*$2)
+        t2.abs()
+        i2 = t2.min_ind()
+        vMeasure = new Vector()
+        vMeasure.copy($o1.recv, i1, i2)
+        v2 = vMeasure.min()
+        vExp = abs((v1 - v2)*(1- 1/exp(1)))
+        vMeasure.sub(vMeasure.x[0]-vExp)
+        for i = 0,vMeasure.size()-1 {
+            if (vMeasure.x[i] <= 0) {
+                iExp = i1 + i
+                break
+            }
+        }
+        tau1 = $o1.rect.x[iExp] - $o1.rect.x[i1]
+        print "tau1 = ", tau1
+
+        t1.copy($o1.rect)
+        t1.sub(2*$2 + $3)
+        t1.abs()
+        i1 = t1.min_ind()
+        v1 = abs($o1.recv.x[i1-1])
+        t2.copy($o1.rect)
+        t2.sub(3*$2)
+        t2.abs()
+        i2 = t2.min_ind()
+        vMeasure = new Vector()
+        vMeasure.copy($o1.recv.abs(), i1, i2)
+        v2 = vMeasure.min()
+        vExp = abs((v1 - v2)*(1- 1/exp(1)))
+        vMeasure.sub(vMeasure.x[0]-vExp)
+        for i = 0,vMeasure.size()-1 {
+            if (vMeasure.x[i] <= 0) {
+                iExp = i1 + i
+                break
+            }
+        }
+        tau2 = $o1.rect.x[iExp] - $o1.rect.x[i1]
+        print "tau2 = ", tau2
+        print "tau  = ", (tau1 + tau2)/2
+    }
+
+
+
+/*  A procedure for running a single simulation of a single cell when
+    estimating the membrane time constant. It is supposed to be run with a
+    current clamp. Inputs:
+    $o1 - a cell to be recorded;
+    $2  - the duration of the measurement period (ms);
+    $3  - the duration of the current pulse (ms);
+    $4  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc singleRunTau() {local cellType  localobj clamp, dataCell
+        cellType = cellString($o1, 0)
+        if (cellType == 1) {
+        	dataCell = new TCdata($o1, clamp, $4)
+        } else if (cellType == 2) {
+        	dataCell = new NRTdata($o1, clamp, $4)
+        } else if (cellType == 3) {
+        	dataCell = new Cx1data($o1, clamp, $4)
+        } else if (cellType == 4) {
+        	dataCell = new Cx2data($o1, clamp, $4)
+        } else if (cellType == 5) {
+        	dataCell = new Cx3data($o1, clamp, $4)
+        }
+        runMain()
+        estTau(dataCell, $2, $3)
+        if ($4) {
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%sdata0.dat", saveData, cellStr)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%sdata0.dat", saveData, cellStr)
+            } else {
+                sprint(dataFile, "z%g_%sdata0.dat", saveData, cellStr)
+            }
+            dataCell.save(dataFile, $4)
+        }
+    }
+
+
+
+/*  A procedure for graphing a variable. Inputs:
+    $s1 - a string definition of the variable with its section location
+          (i.e., "cell.soma.v(0.5)")
+    $2  - wleft
+    $3  - wtop
+    $4  - wwidth
+    $5  - wheight. */
+    proc addGraph() {localobj g
+        g = new Graph(0)
+        g.view(0,1,0,1, $2, $3, $4, $5)
+        g.size(0, tstop, -120, 50)
+        //g.size(9950, 15000, -120, 50)
+        g.xaxis()
+        g.yaxis()
+        g.addvar($s1, 1, 0)
+        graphList[0].append(g)      // crucial bit
+    }
+
+
+
+/*  An object function for setting up the data recording. Returns the data
+    object. Inputs:
+    $o1 - the cell to be recorded
+    $o2 - the voltage clamp object associated with the cell;
+    $3  - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    obfunc data() {local cellType  localobj dataCell
+        cellType = cellString($o1, 0)
+        if (cellType == 1) {
+        	dataCell = new TCdata($o1, $o2)
+        } else if (cellType == 2) {
+        	dataCell = new NRTdata($o1, $o2)
+        } else if (cellType == 3) {
+        	dataCell = new Cx1data($o1, clamp)
+        } else if (cellType == 4) {
+        	dataCell = new Cx2data($o1, clamp)
+        } else if (cellType == 5) {
+        	dataCell = new Cx3data($o1, clamp, $3)
+        }
+        return dataCell
+    }
+
+
+
+/*  An object function for setting up the multiple data recording instances.
+    Returns the list of data objects. Inputs:
+    $o1 - the list of cells to be recorded
+    $o2 - the list of voltage clamp objects associated with the cells
+    $3  - a logical for saving data (0 - no, 1 - yes (full)). */
+    obfunc dataMulti() {local i, cellType  localobj dataCell, dataList
+        dataList = new List()
+        for i = 0, $o1.count()-1 {
+            cellType = cellString($o1.o(i), 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1.o(i), $o2.o(i))
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1.o(i), $o2.o(i))
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1.o(i), $o2.o(i))
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1.o(i), $o2.o(i))
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1.o(i), $o2.o(i))
+            }
+            dataList.append(dataCell)
+        }
+        return dataList
+    }
+
+
+
+/*  A procedure for saving multiple cell data. Inputs:
+    $o1 - the list of data objects
+    $o2 - the corresponding list of cell objects
+    $3  - the number to be added at the beginning of each data file;
+    $4  - a logical for saving data (0 - no, 1 - yes (full)). */
+    proc saveMulti() {
+        for i = 0, $o1.count()-1 {
+            cellString($o2.o(i), 1)
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%g_%sdata%g.dat", saveData, $3, cellStr, i)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%g_%sdata%g.dat", saveData, $3, cellStr, i)
+            } else {
+                sprint(dataFile, "z%g_%g_%sdata%g.dat", saveData, $3, cellStr, i)
+            }
+            $o1.o(i).save(dataFile, $4)
+        }
+    }
+
+
+
+/*  An object function for setting up the multiple data recording instances
+    with minimal data saved.
+    Returns the list of data objects. Inputs:
+    $o1 - a list of cells to be recorded;
+    $o2 - a list of voltage clamp objects corresponding to the cells;
+    $3  - a scalar indicating the size of the data file: 1 - full, 0 - minimal. */
+    obfunc dataMultiParallel() {local i, cellType  localobj dataCell, dataList
+        dataList = new List()
+        for i = 0, $o1.count()-1 {
+            cellType = cellString($o1.o(i), 0)
+            if (cellType == 1) {
+                dataCell = new TCdata($o1.o(i), $o2.o(i), $3)
+            } else if (cellType == 2) {
+                dataCell = new NRTdata($o1.o(i), $o2.o(i), $3)
+            } else if (cellType == 3) {
+                dataCell = new Cx1data($o1.o(i), $o2.o(i), $3)
+            } else if (cellType == 4) {
+                dataCell = new Cx2data($o1.o(i), $o2.o(i), $3)
+            } else if (cellType == 5) {
+                dataCell = new Cx3data($o1.o(i), $o2.o(i), $3)
+            }
+            dataList.append(dataCell)
+        }
+        return dataList
+    }
+
+
+
+/*  A procedure for saving multiple cortical cell data sets. Inputs:
+    $o1 - a list of data objects;
+    $o2 - a corresponding list of cell objects;
+    $o3 - a corresponding vector of global identifiers;
+    $o4 - a vector of cell type identifiers;
+    $o5 - a list of global identifier vectors;
+    $6  - the starting gid;
+    $7  - a number to be added at the beginning of each data file. */
+    proc saveMultiParallelCx() {local i  localobj dataObjs, cells, nodeGids, cellTypeInd
+        dataObjs = $o1
+        cells = $o2
+        nodeGids = $o3
+        cellTypeInd = $o4
+        startGid = $6
+        for i = 0, dataObjs.count()-1 {
+            strdef order
+            if (nodeGids.x[i] < 10) {
+                sprint(order, "000%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 100) {
+                sprint(order, "00%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 1000) {
+                sprint(order, "0%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 10000) {
+                sprint(order, "%g", nodeGids.x[i])
+            }
+            strdef cellTypeStr
+            if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()-1) {
+                sprint(cellTypeStr, "RS")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()+$o5.o(2).size()-1) {
+                sprint(cellTypeStr, "EF")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()+$o5.o(2).size()+$o5.o(3).size()-1) {
+                sprint(cellTypeStr, "IB")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()+$o5.o(2).size()+$o5.o(3).size()+$o5.o(4).size()-1) {
+                sprint(cellTypeStr, "RIB")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()+$o5.o(2).size()+$o5.o(3).size()+$o5.o(4).size()+$o5.o(5).size()-1) {
+                sprint(cellTypeStr, "SIB")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(1).size()+$o5.o(2).size()+$o5.o(3).size()+$o5.o(4).size()+$o5.o(5).size()+$o5.o(6).size()-1) {
+                sprint(cellTypeStr, "ND")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= $o5.o(8).size()-1) {
+                sprint(cellTypeStr, "LTS")
+            } else if (cellTypeInd.x[nodeGids.x[i]-startGid] <= cellTypeInd.size()-1) {
+                sprint(cellTypeStr, "FS")
+            }
+            cellString(cells.o(i), 0)
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            } else {
+                sprint(dataFile, "z%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            }
+            dataObjs.o(i).save(dataFile)
+        }
+    }
+
+
+
+/*  A function for extracting cortical layer EEG data. Inputs:
+    $o1 - a list of data objects;
+    $o2 - a corresponding vector of global identifiers;
+    $3  - the starting gid;
+    $4  - a cortical layer number. */
+    obfunc getEEG() {local i  localobj dataObjs, nodeGids, dataVec, dataVecTemp
+        dataObjs = $o1
+        nodeGids = $o2
+        startGid = $3
+        dataVec = dataObjs.o(0).synData()
+        dataVec = new Vector(dataVec.size())
+        for i = 0, dataObjs.count()-1 {
+            cellPos = nodeGids.x[i]-startGid
+            cellPos = abs(cellPos - 49.5)*20
+            if ($4 == 2) {
+                h = 351.8
+            } else if ($4 == 4) {
+                h = 693.4
+            } else if ($4 == 5) {
+                h = 1089.4
+            } else if ($4 == 6) {
+                h = 1597.2
+            }
+            r_i = sqrt(h^2 + cellPos^2)
+            dataVecTemp = dataObjs.o(i).synData()
+            if (dataVecTemp.size()) {
+                dataVecTemp = dataVecTemp.mul((230/(4*PI))/r_i)
+                dataVec = dataVec.add(dataVecTemp)
+            }
+        }
+        return dataVec
+    }
+
+
+
+/*  A procedure for saving multiple thalamic cell data sets. Inputs:
+    $o1 - a list of data objects;
+    $o2 - a corresponding list of cell objects;
+    $o3 - a corresponding vector of global identifiers;
+    $o4 - a vector of cell type identifiers;
+    $o5 - a list of global identifier vectors;
+    $6  - the starting gid;
+    $7  - a number to be added at the beginning of each data file. */
+    proc saveMultiParallelTh() {local i  localobj dataObjs, cells, nodeGids, cellTypeInd, syn
+        dataObjs = $o1
+        cells = $o2
+        nodeGids = $o3
+        cellTypeInd = $o4
+        startGid = $6
+        for i = 0, dataObjs.count()-1 {
+            strdef order
+            if (nodeGids.x[i] < 10) {
+                sprint(order, "000%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 100) {
+                sprint(order, "00%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 1000) {
+                sprint(order, "0%g", nodeGids.x[i])
+            } else if (nodeGids.x[i] < 10000) {
+                sprint(order, "%g", nodeGids.x[i])
+            }
+            strdef cellTypeStr
+            if (nodeGids.x[i]-startGid <= $o5.o(1).size()-1) {
+                sprint(cellTypeStr, "TC")
+            } else {
+                if (cellTypeInd.x[nodeGids.x[i]-startGid-$o5.o(1).size()] <= $o5.o(2).size()-1) {
+                    sprint(cellTypeStr, "WA")
+                } else if (cellTypeInd.x[nodeGids.x[i]-startGid-$o5.o(1).size()] <= cellTypeInd.size()-1) {
+                    sprint(cellTypeStr, "WQ")
+                }
+            }
+            cellString(cells.o(i), 0)
+            strdef dataFile
+            if (varDt && !varDt_local) {
+                sprint(dataFile, "x%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            } else if (varDt && varDt_local) {
+                sprint(dataFile, "y%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            } else {
+                sprint(dataFile, "z%g_%sdata_%g_%s_%s.dat", saveData, cellStr, $7, order, cellTypeStr)
+            }
+            dataObjs.o(i).save(dataFile)
+        }
+    }

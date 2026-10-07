@@ -1,0 +1,163 @@
+// Full thalamus
+
+
+
+objref ncNRTNRT, ncNRTminisGABAaout, gapList_Th
+objref nc_TCFO_NRTHO, nc_NRTHO_TCFO, nc_NRTHO_TCFO_minisGABAaout
+objref nc_TCHO_NRTFO, nc_NRTFO_TCHO, nc_NRTFO_TCHO_minisGABAaout
+
+{ load_file("section.hoc") }
+
+if (isFO || isHO) {
+    if (isFO) {
+        createSec("FO")
+    }
+    if (isHO) {
+        createSec("HO")
+    }
+}
+
+
+
+proc initParam() {
+    if (isFO && isHO) {
+        ratio_TCFO_NRTHO = ratioTCNRT/3
+        ratio_NRTHO_TCFO = ratioNRTTC/3
+        ratio_TCHO_NRTFO = ratio_TCFO_NRTHO
+        ratio_NRTFO_TCHO = ratio_NRTHO_TCFO
+        ratioNRTNRT = ratioNRTNRT/2
+    }
+}
+
+
+
+proc connectSecs() {local i, gid, sgid, nCons  localobj amps, cell, gapj, delayVec, weightVec
+    if (isFO || isHO) {
+        // Combine NRT lists from different sections:
+        if (ratioNRTNRT) {
+            NRTcells = new List()
+            nodeNRTgids = new Vector()
+            NRTgids = new Vector()
+            delNRTNRT = new Vector()
+            weiNRTNRT = new Vector()
+            if (isFO) {
+                for i = 0, cellLists_FO.o(4).count()-1 {
+                    NRTcells.append(cellLists_FO.o(4).o(i))
+                }
+                nodeNRTgids = nodeNRTgids.append(nodeGidLists_FO.o(4))
+                NRTgids = NRTgids.append(gidLists_FO.o(4))
+                delNRTNRT = delNRTNRT.append(delNRTNRT_FO)
+                weiNRTNRT = weiNRTNRT.append(weiNRTNRT_FO)
+            }
+            if (isHO) {
+                for i = 0, cellLists_HO.o(4).count()-1 {
+                    NRTcells.append(cellLists_HO.o(4).o(i))
+                }
+                nodeNRTgids = nodeNRTgids.append(nodeGidLists_HO.o(4))
+                NRTgids = NRTgids.append(gidLists_HO.o(4))
+                delNRTNRT = delNRTNRT.append(delNRTNRT_HO)
+                weiNRTNRT = weiNRTNRT.append(weiNRTNRT_HO)
+            }
+
+            // Create NRT-NRT GABAa synapses and connect them to the source:
+            createSyns(NRTcells, nodeNRTgids, "GABAa", P_release_Th, amps, pc)
+            ncNRTNRT = connectSyns(NRTcells, NRTgids, NRTcells, NRTgids, ratioNRTNRT, "GABAa", delNRTNRT, weiNRTNRT, 0, pc, randomise.x[4], synSpread_Th, P_release_Th, amps, edge)
+            if (randomise.x[4]) {
+                weight = 0.06   // 0.06: ~-0.2 mV @-65 mV and Ri = ~160 MOhms
+                ncNRTminisGABAaout = connectMinis(NRTcells, 0.6, weight, "GABAa")
+                ncNRTNRT.append(ncNRTminisGABAaout)
+            }
+        }
+    }
+    if (isFO && isHO) {
+        // Create TC_FO-NRT_HO GLU synapses and connect them to the source:
+        nc_TCFO_NRTHO = connect2pops(ratio_TCFO_NRTHO, 1, TCNRTfact, cellLists_FO.o(1), \
+                                     gidLists_FO.o(1), cellLists_HO.o(4), gidLists_HO.o(4), synSpread_Th, P_release_Th, amps, edge, "GLU")
+        
+        // Create NRT_HO-TC_FO GABA synapses and connect them to the source:
+        nConns = round(ratio_NRTHO_TCFO*gidLists_HO.o(4).size()*gidLists_FO.o(1).size()*synSpread_Th)
+        delayVec = ranDel(delayNRTTC, nConns, pc, randomise.x[2])
+        weightVec = ranWei(NRTTCfact, nConns, pc, randomise.x[3])
+        nc_NRTHO_TCFO = connectSyns(cellLists_HO.o(4), gidLists_HO.o(4), cellLists_FO.o(1), gidLists_FO.o(1), ratio_NRTHO_TCFO, "GABAfull", delayVec, weightVec, 1, pc, randomise.x[4], synSpread_Th, P_release_Th, amps, edge)
+        if (randomise.x[4]) {
+            weight = 0.375  // 0.375: ~-0.2 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -70 mV
+            nc_NRTHO_TCFO_minisGABAaout = connectMinis(cellLists_FO.o(1), 0.6, weight, "GABAa")
+            nc_NRTHO_TCFO.append(nc_NRTHO_TCFO_minisGABAaout)
+        }
+        
+        // Create TC_HO-NRT_FO GLU synapses and connect them to the source:
+        nc_TCHO_NRTFO = connect2pops(ratio_TCHO_NRTFO, 1, TCNRTfact, cellLists_HO.o(1), \
+                                     gidLists_HO.o(1), cellLists_FO.o(4), gidLists_FO.o(4), synSpread_Th, P_release_Th, amps, edge, "GLU")
+        
+        // Create NRT_FO-TC_HO GABA synapses and connect them to the source:
+        delayVec = ranDel(delayNRTTC, nConns, pc, randomise.x[2])
+        weightVec = ranWei(NRTTCfact, nConns, pc, randomise.x[3])
+        nc_NRTFO_TCHO = connectSyns(cellLists_FO.o(4), gidLists_FO.o(4), cellLists_HO.o(1), gidLists_HO.o(1), ratio_NRTFO_TCHO, "GABAfull", delayVec, weightVec, 1, pc, randomise.x[4], synSpread_Th, P_release_Th, amps, edge)
+        if (randomise.x[4]) {
+            weight = 0.375  // 0.375: ~-0.2 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -70 mV
+            nc_NRTFO_TCHO_minisGABAaout = connectMinis(cellLists_HO.o(1), 0.6, weight, "GABAa")
+            nc_NRTFO_TCHO.append(nc_NRTFO_TCHO_minisGABAaout)
+        }        
+    }
+    
+    // Create gap junctions:
+    if (gaps && isFO && isHO) {
+        gapList_Th = new List()
+        for i = 0,1 {
+            if (i) { gid = gidLists_HO.o(4).min()
+            } else { gid = gidLists_FO.o(4).max() }
+            sgid = gidLists_FO.o(4).size() - i
+            if (pc.gid_exists(gid)) {
+                cell = pc.gid2cell(gid)
+                cell.soma {
+                    gapj = new HalfGap(.5)
+                    gapj.r = gapr
+                    gapList_Th.append(gapj)
+                    cell.appendGapList(gapj)
+                    pc.target_var(gapj, &gapj.vgap, sgid)
+                }
+            }
+        }
+        for i = 0,1 {
+            if (i) { gid = gidLists_HO.o(4).min()+1
+            } else { gid = gidLists_FO.o(4).max()-1 }
+            sgid = gidLists_FO.o(4).size() +1 - i*2
+            if (pc.gid_exists(gid)) {
+                cell = pc.gid2cell(gid)
+                cell.soma {
+                    gapj = new HalfGap(.5)
+                    //gapj.r = 2*gapr
+                    gapj.r = gapr
+                    gapList_Th.append(gapj)
+                    cell.appendGapList(gapj)
+                    pc.target_var(gapj, &gapj.vgap, sgid)
+                }
+            }
+        }
+        varDt_local = 0
+    }
+}
+
+
+
+proc adjMinis() {
+    if (isFO && isHO) {
+        // TC:
+        converge_TC = gidLists_HO.o(4).size()*(ratioNRTTC+ratio_NRTHO_TCFO)*synSpread_Th*P_release_Th
+        adjLayerMinis(cellLists_FO.o(1), converge_TC)
+        adjLayerMinis(cellLists_HO.o(1), converge_TC)
+
+        // NRT:
+        converge_NRT = converge_NRT + gidLists_FO.o(1).size()*ratio_TCFO_NRTHO*synSpread_Th*P_release_Th
+        adjLayerMinis(cellLists_FO.o(4), converge_NRT)
+        adjLayerMinis(cellLists_HO.o(4), converge_NRT)
+    }
+}
+
+
+
+initParam()
+connectSecs()
+if (randomise.x[4]) {
+    adjMinis()
+}

@@ -1,0 +1,127 @@
+// Perform cortical layer 5 related computing and simulation routines
+
+objref cell, stim, stim2, stim3, stim4, stim5, stimList, clamp, clampList
+
+{ load_file("layer.hoc") }
+median = 1
+createLayer("L5")
+stimList = new List()
+clampList = new List()
+for i = 0, cells.count()-1 {
+    clamp = vClamp(cellLists_L5.o(0).o(i), 0, 0, 0, -65, -65, -65)
+    clampList.append(clamp)
+}
+
+
+
+/*  A procedure for running the cortical layer 5 model. Inputs:
+    $o1 - a list of cells;
+    $o2 - a list of corresponding voltage clamp objects;
+    $o3 - a vector of corresponding global identifiers;
+    $o4 - a vector of cell type identifiers (single universal);
+    $o5 - a list of global identifier vectors;
+    $6  - the number to be added at the beginning of each data file. */
+    proc L5basic() {localobj dataList
+        if (saveData) {
+            dataList = dataMultiParallel($o1, $o2)
+        }
+        runMain()
+        if (saveData) {
+            saveMultiParallel(dataList, $o1, $o3, $o4, $o5, gidLists_L5.o(0).min(), $6)
+        }
+    }
+
+
+
+/*  A procedure for adjusting the input resistance of all the L5 cells
+    collectively. Inputs:
+    $o1 - a list of cells. */
+    proc L5Ri() {local i  localobj cells
+        cells = $o1
+/*
+        for i = 0, cells.count()-1 {
+            cells.o(i).soma.g_pas = cells.o(i).soma.g_pas - 0 //0.0000034
+            cells.o(i).dend.g_pas = cells.o(i).dend.g_pas - 0 //0.0000034
+            cells.o(i).soma.g_naleak = cells.o(i).soma.g_naleak - 0
+            cells.o(i).dend.g_naleak = cells.o(i).dend.g_naleak - 0
+        }
+*/
+    }
+
+
+
+
+
+
+
+if (runMode == 0) {
+    //gid = gidLists_L5.o(6).x[69]
+    //if (pc.gid_exists(gid, pc.id)) {
+    //    stim = stimSingle(pc.gid2cell(gid), 0e3, 10e3, -0.1)
+    //}
+    L5basic(cellLists_L5.o(0), clampList, nodeGidLists_L5.o(0), cellTypeInd_L5, gidLists_L5, 5)
+} else if (runMode == 1) {
+    glut = 0
+    if (glut) {
+        stim = stimSingle(cellLists_L5.o(6).o(0), 1e3, 2, 1575)
+        //vClampAdj(clampList.o(1), 4e3, 0, 0, -65, -65, -65)
+        if (!pProc) {
+            addGraph("cellLists_L5.o(6).o(0).soma.v(0.5)",      0, 1104/2, 1770/2, 910/2)
+            addGraph("cellLists_L5.o(6).o(1).soma.v(0.5)", 1982/2, 1104/2, 1770/2, 910/2)
+        }
+    } else {
+        if (pProc) {
+            for i = 0,0 {
+                gid = gidLists_L5.o(7).x[i]
+                if (pc.gid_exists(gid, pc.id)) {
+                    stim = stimSingle(pc.gid2cell(gid), 1e3, 62.5, 0.8)
+                }
+            }
+        } else {
+            stim = stimSingle(cellLists_L5.o(7).o(0), 1e3, 62.5, 0.8, "soma")
+            /* stim2 = stimSingle(cellLists_L5.o(7).o(1), 1e3, 62.5, 0.8)
+            stim3 = stimSingle(cellLists_L5.o(7).o(2), 1e3, 62.5, 0.8)
+            stim4 = stimSingle(cellLists_L5.o(7).o(3), 1e3, 62.5, 0.8)
+            stim5 = stimSingle(cellLists_L5.o(7).o(4), 1e3, 62.5, 0.8)
+            */
+            //vClampAdj(clampList.o(1), 4e3, 0, 0, -65, -65, -65)
+            //stim = stimSingle(cellLists_L5.o(7).o(0), 1e3, 62.5, 0.4)
+            //stim2 = stimSingle(cellLists_L5.o(6).o(0), 0e3, 4e3, 0.076)
+            //addGraph("cellLists_L5.o(7).o(0).soma.v(0.5)",      0, 1104/2, 1770/2, 910/2)
+            //addGraph("cellLists_L5.o(6).o(0).soma.v(0.5)", 1982/2, 1104/2, 1770/2, 910/2)
+        }
+    }
+    L5basic(cellLists_L5.o(0), clampList, nodeGidLists_L5.o(0), cellTypeInd_L5, gidLists_L5, 5)
+} else if (runMode == 2) {
+    /*for i = 0, cells.count()-1 {
+        stim = stimSingle(cells.o(i), 1e3, 2e3, 0.1)
+        stimList.append(stim)
+    }*/
+    if (!pProc) {
+        cell = cells.o(0)
+        stim = stimSingle(cell, 1e3, 9e3, 0.02)
+    } else if (pc.gid_exists(0, pc.id)) {
+        cell = pc.gid2cell(0)
+        stim = stimSingle(cell, 1e3, 9e3, 0.02)
+    }
+    if (!pProc) {
+        //addGraph("PYcells.o(0).soma.v(0.5)",      0, 1104/2, 1770/2, 910/2)
+        //addGraph("PYcells.o(99).soma.v(0.5)", 1982/2, 1104/2, 1770/2, 910/2)
+    }
+    L5basic(cellLists_L5.o(0), clampList, nodeGidLists_L5.o(0), cellTypeInd_L5, gidLists_L5, 5)
+} else if (runMode == 6) {
+    /*if (!pProc) {
+        bunch = 0
+        addGraph("cells.o((bunch*8 + 0)%cells.count()).soma.v(0.5)",             0,      0, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 1)%cells.count()).soma.v(0.5)",        1982/2,      0, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 2)%cells.count()).soma.v(0.5)",             0, 1104/2, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 3)%cells.count()).soma.v(0.5)",        1982/2, 1104/2, 1770/2, 910/2)
+
+        addGraph("cells.o((bunch*8 + 4)%cells.count()).soma.v(0.5)",          1982,      0, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 5)%cells.count()).soma.v(0.5)", 1982 + 1982/2,      0, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 6)%cells.count()).soma.v(0.5)",          1982, 1104/2, 1770/2, 910/2)
+        addGraph("cells.o((bunch*8 + 7)%cells.count()).soma.v(0.5)", 1982 + 1982/2, 1104/2, 1770/2, 910/2)
+    }*/
+    L5Ri(cells)
+    L5basic(cellLists_L5.o(0), clampList, nodeGidLists_L5.o(0), cellTypeInd_L5, gidLists_L5, 5)
+}

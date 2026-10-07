@@ -1,0 +1,561 @@
+/*----------------------------------------------------------------------------
+
+    FULL CORTICAL LAYER 5 MODEL
+	===========================
+
+    The cortical layer 5 is comprised of two layers - the excitatory and
+    inhibitory cell layers. The excitatory cell layer has 50 RS, 40 IB, and
+    10 cortical pacemaker cells. The inhibitory layer contains 25 FS cells.
+    A second version of this layer is adjusted so that the excitatory layer
+    has 50 RS, 15 IB, 10 pacemaker, and 25 RIB cells. The latter version is
+    supposed to be pathological leading to SWDs.
+    
+
+    Written by Martynas Dervinis, Cardiff University, 2014.
+
+----------------------------------------------------------------------------*/
+
+
+
+objref cellTypeInd, devRi, cells, RScells, EFcells, IBcells, RIBcells, NDcells, PYcells, FScells
+objref RSgids, EFgids, IBgids, RIBgids, NDgids, PYgids, FSgids, nodeGids, nodePYgids, nodeFSgids
+objref nclist, ncPYPYAMPA, ncPYPYNMDA, ncPYINAMPA, ncPYINNMDA, ncINPYGABAa, ncINPYGABAb
+objref delPYPY, delPYIN, delINPY, weiPYPYAMPA, weiPYPYNMDA, weiPYINAMPA, weiPYINNMDA, weiINPYGABAa, weiINPYGABAb
+objref ncPYPY, ncPYIN, ncINPY, weiPYPY, weiPYIN, weiINPY
+objref ncPYminisAMPAin, ncPYminisAMPAout, ncPYminisGABAain, ncPYminisGABAaout, ncINminisAMPAin, ncINminisAMPAout
+objref ncSpike, tvec, idvec, nil
+
+
+
+// Model parameters:
+ExcInFact = 1/2.35
+synFact = 0.11
+
+PYPYfact = synFact*ExcInFact*2*1.1
+PYINfact = synFact*ExcInFact*2*0.23
+INPYfact = synFact*(1/ExcInFact)*2*0.4
+
+fanoutFact = 100
+fanoutPYPY = fanoutFact*8 + 1  // only 9, 17, 25, etc... Increments of 8
+fanoutPYIN = fanoutFact*2      // only 2, 4, 6, etc... Increments of 2
+fanoutINPY = fanoutFact*8      // only 8, 16, 24, etc... Increments of 8
+
+delay = 2           // must be >0.6
+
+
+
+// ------------------------------------------------------------------------
+// Create models of single cells:
+// ------------------------------------------------------------------------
+
+tvec = new Vector()         // will be Vectors that record all spike times (tvec)
+idvec = new Vector()        // and the corresponding id numbers of the cells that spiked (idvec)
+ncSpike = new List()
+
+ngids = 125
+cells = new List()
+RScells = new List()
+EFcells = new List()
+IBcells = new List()
+RIBcells = new List()
+NDcells = new List()
+PYcells = new List()
+FScells = new List()
+nodeGids = new Vector()
+nodePYgids = new Vector()
+nodeFSgids = new Vector()
+RSgids = new Vector(0.24*ngids) // 30/125
+EFgids = new Vector(0.16*ngids) // 20/125
+if (modelType == 15) {
+    IBgids = new Vector(0.32*ngids) // 40/125
+} else if (modelType == 16) {
+    IBgids = new Vector(0.12*ngids) // 15/125
+    RIBgids = new Vector(0.2*ngids) // 25/125
+}
+NDgids = new Vector(0.08*ngids) // 10/125
+PYgids = new Vector(0.8*ngids) // 100/125
+FSgids = new Vector(0.2*ngids) // 25/125
+
+// Set the positions of cells within the network:
+if (pc.id == 0) {
+    if (randomise.x[0]) {
+        cellTypeInd = randExhaust(r, 0, PYgids.size()-1)
+        randomInstance += 1
+        for i = cellTypeInd.size(), ngids-1 {
+            cellTypeInd.append(i)
+        }
+    } else {
+        cellTypeInd = vecIncrement(0,1,ngids-1)
+    }
+} else {
+    cellTypeInd = new Vector()
+}
+if (pProc) {
+	{pc.barrier()}
+    pc.broadcast(cellTypeInd, 0)
+}
+
+// Randomly pick input resistance deviations for each cell:
+devRi = new Vector(ngids)
+if (pc.id == 0) {
+    if (randomise.x[1]) {
+        {r.Random123(randomInstance,0)}
+        r.normal(0,1)
+        for i = 0, ngids-1 {
+            devRi.x[i] = normRepick(r)
+        }
+        randomInstance += 1
+    }
+}
+if (pProc) {
+	{pc.barrier()}
+    pc.broadcast(devRi, 0)
+}
+
+AMPAsynsPY = fanoutPYPY-1
+GABAAsynsPY = fanoutINPY*FSgids.size()/PYgids.size()
+AMPAsynsIN = fanoutPYIN*PYgids.size()/FSgids.size()
+proc createMini() { // $o1 - a cell; $2 - a random stream id2; $3 - number of AMPA synapses per cell;
+                    // $4 - number of GABAAsynapses per cell.
+    $o1.createMini("AMPA", $2, $3)
+    $o1.createMini("GABAa", $2, $4)
+}
+
+proc createCells() {local i, j, k, l, m, n, o, x, gid  localobj cell, mini, nc
+    if (pProc) {
+        for cellitr(&gid, pc) {
+            pc.set_gid2node(gid, pc.id)
+            if (cellTypeInd.x[gid] <= 0.24*ngids-1) {
+                cell = new Cx3cell(9)
+                RScells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= 0.4*ngids-1) {
+                cell = new Cx3cell(10)
+                EFcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 15 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+                cell = new Cx3cell(11)
+                IBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.52*ngids-1) {
+                cell = new Cx3cell(11)
+                IBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+                cell = new Cx3cell(12)
+                RIBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= 0.8*ngids-1) {
+                cell = new Cx3cell(13)
+                NDcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= ngids-1) {
+                cell = new Cx3cell(14)
+                FScells.append(cell)
+                if (randomise.x[4]) {
+                    cell.createMini("AMPA", cellTypeInd.x[gid], AMPAsynsIN)
+                }
+                nodeFSgids.append(gid)
+            }
+            nc = cell.connect2target(nil, 1, 1)
+            pc.cell(gid, nc)
+            //pc.spike_record(gid, tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+            if (randomise.x[1] == 1) {
+                x = normRepick(r)
+                cell.soma.g_pas(0.5) = cell.soma.g_pas(0.5) + 0.000001*devRi.x[cellTypeInd.x[gid]]
+                cell.dend.g_pas(0.5) = cell.dend.g_pas(0.5) + 0.000001*devRi.x[cellTypeInd.x[gid]]
+            }
+        }
+    } else {
+        for gid = 0, ngids-1 {
+            if (cellTypeInd.x[gid] <= 0.24*ngids-1) {
+                cell = new Cx3cell(9)
+                RScells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= 0.4*ngids-1) {
+                cell = new Cx3cell(10)
+                EFcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 15 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+                cell = new Cx3cell(11)
+                IBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.52*ngids-1) {
+                cell = new Cx3cell(11)
+                IBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+                cell = new Cx3cell(12)
+                RIBcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= 0.8*ngids-1) {
+                cell = new Cx3cell(13)
+                NDcells.append(cell)
+                PYcells.append(cell)
+                if (randomise.x[4]) {
+                    createMini(cell, cellTypeInd.x[gid], AMPAsynsPY, GABAAsynsPY)
+                }
+                nodePYgids.append(gid)
+            } else if (cellTypeInd.x[gid] <= ngids-1) {
+                cell = new Cx3cell(14)
+                FScells.append(cell)
+                if (randomise.x[4]) {
+                    cell.createMini("AMPA", cellTypeInd.x[gid], AMPAsynsIN)
+                }
+                nodeFSgids.append(gid)
+            }
+            nc = cell.connect2target(nil, 1, 1)
+            //nc.record(tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+            if (randomise.x[1] == 1) {
+                x = normRepick(r)
+                cell.soma.g_pas(0.5) = cell.soma.g_pas(0.5) + 0.000001*devRi.x[cellTypeInd.x[gid]]
+                cell.dend.g_pas(0.5) = cell.dend.g_pas(0.5) + 0.000001*devRi.x[cellTypeInd.x[gid]]
+            }
+        }
+    }
+
+    i = 0
+    j = 0
+    k = 0
+    l = 0
+    m = 0
+    n = 0
+    o = 0
+    for gid = 0, ngids-1 {
+        if (cellTypeInd.x[gid] <= 0.24*ngids-1) {
+            RSgids.x[i] = gid
+            i += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid] <= 0.4*ngids-1) {
+            EFgids.x[j] = gid
+            j += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (modelType == 15 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+            IBgids.x[k] = gid
+            k += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.52*ngids-1) {
+        	IBgids.x[k] = gid
+            k += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (modelType == 16 && cellTypeInd.x[gid] <= 0.72*ngids-1) {
+        	RIBgids.x[l] = gid
+            l += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid] <= 0.8*ngids-1) {
+        	NDgids.x[m] = gid
+            m += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid] <= ngids-1) {
+        	FSgids.x[o] = gid
+            o += 1
+        }
+    }
+}
+
+createCells()
+
+
+
+
+
+
+
+// ------------------------------------------------------------------------
+// Create the network:
+// ------------------------------------------------------------------------
+
+syns = 1
+combinedSyns = 1    // Combined AMPA+NMDA and GABAa+GABAb synapses for release probs of <1
+
+if (syns) {
+    // Randomise synaptic delays:
+    delPYPY = new Vector(0.8*ngids*fanoutPYPY)
+    delPYIN = new Vector(0.8*ngids*fanoutPYIN)
+    delINPY = new Vector(0.2*ngids*fanoutINPY)
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[2]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,delPYPY.size()-1 {
+                x = normRepick(r)
+                delPYPY.x[i] = delay + 0.25*x
+                if (delPYPY.x[i] <= 0.6) {
+                    delPYPY.x[i] = 0.61
+                }
+            }
+            for i = 0,delPYIN.size()-1 {
+                x = normRepick(r)
+                delPYIN.x[i] = delay + 0.25*x
+                if (delPYIN.x[i] <= 0.6) {
+                    delPYIN.x[i] = 0.61
+                }
+            }
+            for i = 0,delINPY.size()-1 {
+                x = normRepick(r)
+                delINPY.x[i] = delay + 0.25*x
+                if (delINPY.x[i] <= 0.6) {
+                    delINPY.x[i] = 0.61
+                }
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,delPYPY.size()-1 {
+                delPYPY.x[i] = delay
+                if (delPYPY.x[i] <= 0.6) {
+                    delPYPY.x[i] = 0.61
+                }
+            }
+            for i = 0,delPYIN.size()-1 {
+                delPYIN.x[i] = delay
+                if (delPYIN.x[i] <= 0.6) {
+                    delPYPY.x[i] = 0.61
+                }
+            }
+            for i = 0,delINPY.size()-1 {
+                delINPY.x[i] = delay
+                if (delINPY.x[i] <= 0.6) {
+                    delPYPY.x[i] = 0.61
+                }
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(delPYPY, 0)
+        pc.broadcast(delPYIN, 0)
+        pc.broadcast(delINPY, 0)
+    }
+
+    if (combinedSyns || randomise.x[5]) {
+        // Randomise synaptic weights:
+        weiPYPY = new Vector(0.8*ngids*fanoutPYPY)
+        weiPYIN = new Vector(0.8*ngids*fanoutPYIN)
+        weiINPY = new Vector(0.2*ngids*fanoutINPY)
+        if ((pProc && pc.id == 0) || !pProc) {
+            if (randomise.x[3]) {
+                {r.Random123(randomInstance,0)}
+                r.normal(0,1)
+                for i = 0,weiPYPY.size()-1 {
+                    x = normRepick(r)
+                    weiPYPY.x[i] = (1 + 0.05*x)*PYPYfact
+                }
+                for i = 0,weiPYIN.size()-1 {
+                    x = normRepick(r)
+                    weiPYIN.x[i] = (1 + 0.05*x)*PYINfact
+                }
+                for i = 0,weiINPY.size()-1 {
+                    x = normRepick(r)
+                    weiINPY.x[i] = (1 + 0.05*x)*INPYfact
+                }
+                randomInstance += 1
+            } else {
+                for i = 0,weiPYPY.size()-1 {
+                    weiPYPY.x[i] = PYPYfact
+                }
+                for i = 0,weiPYIN.size()-1 {
+                    weiPYIN.x[i] = PYINfact
+                }
+                for i = 0,weiINPY.size()-1 {
+                    weiINPY.x[i] = INPYfact
+                }
+            }
+        }
+        if (pProc) {
+            {pc.barrier()}
+            pc.broadcast(weiPYPY, 0)
+            pc.broadcast(weiPYIN, 0)
+            pc.broadcast(weiINPY, 0)
+        }
+
+        // Create PY-PY AMPA and NMDA synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "GLU", pc)
+        nclist = connectSyns(PYcells, PYgids, PYcells, PYgids, fanoutPYPY, "GLU", delPYPY, weiPYPY, 0, pc, randomise.x[4])
+        ncPYPY = nclist.o(0)
+        if (randomise.x[4]) {
+            ncPYminisAMPAin = nclist.o(1)
+            weight = 1.1 // 1.1: 0.5mV //weiPYPY.mean()/2
+            ncPYminisAMPAout = connectMinis(PYcells, 0.6, weight, "GLU")
+        }
+
+        // Create PY-IN AMPA and NMDA synapses and connect them to the source:
+        createSyns(FScells, nodeFSgids, "GLU", pc)
+        nclist = connectSyns(PYcells, PYgids, FScells, FSgids, fanoutPYIN, "GLU", delPYIN, weiPYIN, 1, pc, randomise.x[4])
+        ncPYIN = nclist.o(0)
+        if (randomise.x[4]) {
+            ncINminisAMPAin = nclist.o(1)
+            weight = 0.23 // 0.23: 0.5mV //weiPYIN.mean()/2
+            ncINminisAMPAout = connectMinis(FScells, 0.6, weight, "GLU")
+        }
+
+        // Create IN-PY GABAa and GABAb synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "GABA", pc)
+        nclist = connectSyns(FScells, FSgids, PYcells, PYgids, fanoutINPY, "GABA", delINPY, weiINPY, 1, pc, randomise.x[4])      
+        ncINPY = nclist.o(0)
+        if (randomise.x[4]) {
+            ncPYminisGABAain = nclist.o(1)
+            weight = 0.4 // 0.4: 0.25mV @ -71.9mV, 0.55mV @ -64.6 mV; 0.8: 0.5mV, 1.1mV //weiINPY.mean()/2
+            ncPYminisGABAaout = connectMinis(PYcells, 0.6, weight, "GABA")
+        }
+
+    } else {
+        weiPYPYAMPA = new Vector(0.8*ngids*fanoutPYPY)
+        weiPYPYNMDA = new Vector(0.8*ngids*fanoutPYPY)
+        weiPYINAMPA = new Vector(0.8*ngids*fanoutPYIN)
+        weiPYINNMDA = new Vector(0.8*ngids*fanoutPYIN)
+        weiINPYGABAa = new Vector(0.2*ngids*fanoutINPY)
+        weiINPYGABAb = new Vector(0.2*ngids*fanoutINPY)
+        if ((pProc && pc.id == 0) || !pProc) {
+            if (randomise.x[3]) {
+                {r.Random123(randomInstance,0)}
+                r.normal(0,1)
+                for i = 0,weiPYPYAMPA.size()-1 {
+                    x = normRepick(r)
+                    weiPYPYAMPA.x[i] = (1 + 0.05*x)*PYPYfact
+                    //x = normRepick(r)
+                    weiPYPYNMDA.x[i] = (1 + 0.05*x)*PYPYfact*0.00076
+                }
+                for i = 0,weiPYINAMPA.size()-1 {
+                    x = normRepick(r)
+                    weiPYINAMPA.x[i] = (1 + 0.05*x)*PYINfact
+                    //x = normRepick(r)
+                    weiPYINNMDA.x[i] = (1 + 0.05*x)*PYINfact*0.00076
+                }
+                for i = 0,weiINPYGABAa.size()-1 {
+                    x = normRepick(r)
+                    weiINPYGABAa.x[i] = (1 + 0.05*x)*INPYfact
+                    //x = normRepick(r)
+                    weiINPYGABAb.x[i] = (1 + 0.05*x)*INPYfact
+                }
+                randomInstance += 1
+            } else {
+                for i = 0,weiPYPYAMPA.size()-1 {
+                    weiPYPYAMPA.x[i] = PYPYfact
+                    weiPYPYNMDA.x[i] = PYPYfact*0.00076
+                }
+                for i = 0,weiPYINAMPA.size()-1 {
+                    weiPYINAMPA.x[i] = PYINfact
+                    weiPYINNMDA.x[i] = PYINfact*0.00076
+                }
+                for i = 0,weiINPYGABAa.size()-1 {
+                    weiINPYGABAa.x[i] = INPYfact
+                    weiINPYGABAb.x[i] = INPYfact
+                }
+            }
+        }
+        if (pProc) {
+            {pc.barrier()}
+            pc.broadcast(weiPYPYAMPA, 0)
+            pc.broadcast(weiPYPYNMDA, 0)
+            pc.broadcast(weiPYINAMPA, 0)
+            pc.broadcast(weiPYINNMDA, 0)
+            pc.broadcast(weiINPYGABAa, 0)
+            pc.broadcast(weiINPYGABAb, 0)
+        }
+
+        // Create PY-PY AMPA synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "AMPA", pc)
+        nclist = connectSyns(PYcells, PYgids, PYcells, PYgids, fanoutPYPY, "AMPA", delPYPY, weiPYPYAMPA, 0, pc, randomise.x[4])
+        ncPYPYAMPA = nclist.o(0)
+        if (randomise.x[4]) {
+            ncPYminisAMPAin = nclist.o(1)
+            weight = 1.1 // 1.1: 0.5mV //weiPYPYAMPA.mean()/2
+            ncPYminisAMPAout = connectMinis(PYcells, 0.6, weight, "AMPA")
+        }
+
+        // Create PY-PY NMDA synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "NMDA2", pc)
+        nclist = connectSyns(PYcells, PYgids, PYcells, PYgids, fanoutPYPY, "NMDA2", delPYPY, weiPYPYNMDA, 0, pc, 0)
+        ncPYPYNMDA = nclist.o(0)
+
+        // Create PY-IN AMPA synapses and connect them to the source:
+        createSyns(FScells, nodeFSgids, "AMPA", pc)
+        nclist = connectSyns(PYcells, PYgids, FScells, FSgids, fanoutPYIN, "AMPA", delPYIN, weiPYINAMPA, 1, pc, randomise.x[4])
+        ncPYINAMPA = nclist.o(0)
+        if (randomise.x[4]) {
+            ncINminisAMPAin = nclist.o(1)
+            weight = 0.23 // 0.23: 0.5mV //weiPYINAMPA.mean()/2
+            ncINminisAMPAout = connectMinis(FScells, 0.6, weight, "AMPA")
+        }
+
+        // Create PY-IN NMDA synapses and connect them to the source:
+        createSyns(FScells, nodeFSgids, "NMDA2", pc)
+        nclist = connectSyns(PYcells, PYgids, FScells, FSgids, fanoutPYIN, "NMDA2", delPYIN, weiPYINNMDA, 1, pc, 0)
+        ncPYINNMDA = nclist.o(0)
+
+        // Create IN-PY GABAa synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "GABAa", pc)
+        nclist = connectSyns(FScells, FSgids, PYcells, PYgids, fanoutINPY, "GABAa", delINPY, weiINPYGABAa, 1, pc, randomise.x[4])
+        ncINPYGABAa = nclist.o(0)
+        if (randomise.x[4]) {
+            ncPYminisGABAain = nclist.o(1)
+            weight = 0.4 // 0.4: 0.25mV @ -71.9mV, 0.55mV @ -64.6 mV; 0.8: 0.5mV, 1.1mV //weiINPYGABAa.mean()/2
+            ncPYminisGABAaout = connectMinis(PYcells, 0.6, weight, "GABAa")
+        }
+
+        // Create IN-PY GABAb synapses and connect them to the source:
+        createSyns(PYcells, nodePYgids, "GABAb", pc)
+        nclist = connectSyns(FScells, FSgids, PYcells, PYgids, fanoutINPY, "GABAb", delINPY, weiINPYGABAb, 1, pc, 0)
+        ncINPYGABAb = nclist.o(0)
+    }
+}
+
+if (pProc) {
+    pc.setup_transfer()
+}

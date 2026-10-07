@@ -1,0 +1,577 @@
+/*  A class for handling recorded TC data. Inputs:
+    $o1 - a TC cell to be recorded;
+    $o2 - a voltage clamp object;
+    $3  - a scalar indicating the size of the data file - refer to the
+          saveData parameter in the init.hoc file.
+
+    Contains a public procedure 'save' for saving the data. Inputs:
+    $s1 - the name (string) of the data file including its format extension
+          for saving simulation data. */
+
+begintemplate TCdata
+public save, rect, recv, recIVC, reci
+external cvode, varDt, varDt_local, expandList
+
+objref cell, rect, recv, recIVC, reci, recIKleak, recINaleak, recINa, recINam, recINah, recIK, recIKn
+objref recCai, recCahvai, recICa, recICam, recICah, recIh, recIho1, recIho2, recIhp1, recIAHP, recIAHPm1, recIAHPm2
+objref recICAN, recICANp1, recICANo, recINaPm, recIAm1, recIAm2, recIAh1, recIAh2
+objref recIK1m, recIK2m, recIK2h1, recIK2h2, recIHVA, recIHVAm
+objref recAMPA, recNMDA, recmGluR1a, recmGluR1a_R, recmGluR1a_G, recUlast, recD1last, recD2last, GLUfullsynList
+objref recGABAa, recGABAb, receGABAa, receGABAa_R, receGABAa_G, GABAsynList, GABAAsynList
+
+proc initGLUfull() {local i, count  localobj synGLU, synGLUfull   // $o1 - the cell object
+    if (dataGlu) {                                                          // Excitatory synaptic current data
+        synGLU = $o1.getSyn("GLU")
+        synGLUfull = $o1.getSyn("GLUfull")
+        if (object_id(synGLU,1) != -1 || object_id(synGLUfull,1) != -1) {
+            recAMPA = new List()                                            // rec I_AMPA
+            recNMDA = new List()                                            // rec I_NMDA
+            recUlast = new Vector()
+            recD1last = new Vector()
+            recD2last = new Vector()
+            access cell.soma
+            count = 0
+            GLUfullsynList = $o1.getSynList("GLUfull")
+            if (GLUfullsynList.count()) {
+                recmGluR1a = new List()                                     // rec I_mGluR1a
+                recmGluR1a_R = new List()                                   // rec I_mGluR1a R state
+                recmGluR1a_G = new List()                                   // rec I_mGluR1a G state
+                if (varDt) {
+                    for i = 0, GLUfullsynList.count()-1 {
+                        recAMPA = expandList(recAMPA)
+                        cvode.record(&GLUfullsynList.o(i).iAMPA, recAMPA.o(i), rect)
+                        recNMDA = expandList(recNMDA)
+                        cvode.record(&GLUfullsynList.o(i).iNMDA, recNMDA.o(i), rect)
+                        recmGluR1a = expandList(recmGluR1a)
+                        cvode.record(&GLUfullsynList.o(i).iKLeak, recmGluR1a.o(i), rect)
+                        recmGluR1a_R = expandList(recmGluR1a_R)
+                        cvode.record(&GLUfullsynList.o(i).R_c, recmGluR1a_R.o(i), rect)
+                        recmGluR1a_G = expandList(recmGluR1a_G)
+                        cvode.record(&GLUfullsynList.o(i).G_c, recmGluR1a_G.o(i), rect)
+                        /* if (bigData == 12) {
+                            recUlast = expandList(recUlast)
+                            cvode.record(&GLUfullsynList.o(i).Ulast, recUlast.o(i), rect)
+                            recD1last = expandList(recD1last)
+                            cvode.record(&GLUfullsynList.o(i).D1last, recD1last.o(i), rect)
+                            recD2last = expandList(recD2last)
+                            cvode.record(&GLUfullsynList.o(i).D2last, recD2last.o(i), rect)
+                        } */
+                        count += 1
+                    }
+                } else {
+                    for i = 0, GLUfullsynList.count()-1 {
+                        recAMPA = expandList(recAMPA)
+                        recAMPA.o(i).record(&GLUfullsynList.o(i).iAMPA)
+                        recNMDA = expandList(recNMDA)
+                        recNMDA.o(i).record(&GLUfullsynList.o(i).iNMDA)
+                        recmGluR1a = expandList(recmGluR1a)
+                        recmGluR1a.o(i).record(&GLUfullsynList.o(i).iKLeak)
+                        recmGluR1a_R = expandList(recmGluR1a_R)
+                        recmGluR1a_R.o(i).record(&GLUfullsynList.o(i).R_c)
+                        recmGluR1a_G = expandList(recmGluR1a_G)
+                        recmGluR1a_G.o(i).record(&GLUfullsynList.o(i).G_c)
+                        /* if (bigData == 12) {
+                            recUlast = expandList(recUlast)
+                            recUlast.o(i).record(&GLUfullsynList.o(i).Ulast)
+                            recD1last = expandList(recD1last)
+                            recD1last.o(i).record(&GLUfullsynList.o(i).D1last)
+                            recD2last = expandList(recD2last)
+                            recD2last.o(i).record(&GLUfullsynList.o(i).D2last)
+                        } */
+                        count += 1
+                    }
+                }
+            }
+            if (object_id(synGLU,1) != -1) {
+                if (varDt) {
+                    recAMPA = expandList(recAMPA)
+                    cvode.record(&synGLU.iAMPA, recAMPA.o(count), rect)
+                    recNMDA = expandList(recNMDA)
+                    cvode.record(&synGLU.iNMDA, recNMDA.o(count), rect)
+                    if (bigData == 12) {
+                        recUlast = expandList(recUlast)
+                        cvode.record(&synGLU.Ulast, recUlast, rect)
+                        recD1last = expandList(recD1last)
+                        cvode.record(&synGLU.D1last, recD1last, rect)
+                        recD2last = expandList(recD2last)
+                        cvode.record(&synGLU.D2last, recD2last, rect)
+                    }
+                } else {
+                    recAMPA = expandList(recAMPA)
+                    recAMPA.o(count).record(&synGLU.iAMPA)
+                    recNMDA = expandList(recNMDA)
+                    recNMDA.o(count).record(&synGLU.iNMDA)
+                    if (bigData == 12) {
+                        recUlast = expandList(recUlast)
+                        recUlast.record(&synGLU.Ulast)
+                        recD1last = expandList(recD1last)
+                        recD1last.record(&synGLU.D1last)
+                        recD2last = expandList(recD2last)
+                        recD2last.record(&synGLU.D2last)
+                    }
+                }
+            }
+        }
+    }
+}
+
+proc initGABA() {local i, count   // $o1 - the cell object
+    if (dataGABA) {                                                         // Inhibitory synaptic current data
+        count = 0
+        access cell.soma
+        GABAsynList = $o1.getSynList("GABAfull")
+        if (GABAsynList.count()) {
+            recGABAa = new List()                                           // rec I_GABAa
+            recGABAb = new List()                                           // rec I_GABAb
+            receGABAa = new List()                                          // rec I_eGABAa
+            receGABAa_R = new List()                                        // rec I_eGABAa R state
+            receGABAa_G = new List()                                        // rec I_eGABAa G state
+            if (varDt) {
+                for i = 0, GABAsynList.count()-1 {
+                    recGABAa = expandList(recGABAa)
+                    cvode.record(&GABAsynList.o(i).i_a, recGABAa.o(i), rect)
+                    recGABAb = expandList(recGABAb)
+                    cvode.record(&GABAsynList.o(i).i_b, recGABAb.o(i), rect)
+                    receGABAa = expandList(receGABAa)
+                    cvode.record(&GABAsynList.o(i).iKLeak, receGABAa.o(i), rect)
+                    receGABAa_R = expandList(receGABAa_R)
+                    cvode.record(&GABAsynList.o(i).R_c, receGABAa_R.o(i), rect)
+                    receGABAa_G = expandList(receGABAa_G)
+                    cvode.record(&GABAsynList.o(i).G_c, receGABAa_G.o(i), rect)
+                    count += 1
+                }
+            } else {
+                for i = 0, GABAsynList.count()-1 {
+                    recGABAa = expandList(recGABAa)
+                    recGABAa.o(i).record(&GABAsynList.o(i).i_a)
+                    recGABAb = expandList(recGABAb)
+                    recGABAb.o(i).record(&GABAsynList.o(i).i_b)
+                    receGABAa = expandList(receGABAa)
+                    receGABAa.o(i).record(&GABAsynList.o(i).iKLeak)
+                    receGABAa_R = expandList(receGABAa_R)
+                    receGABAa_R.o(i).record(&GABAsynList.o(i).R_c)
+                    receGABAa_G = expandList(receGABAa_G)
+                    receGABAa_G.o(i).record(&GABAsynList.o(i).G_c)
+                    count += 1
+                }
+            }
+        } else {
+            GABAsynList = $o1.getSynList("GABA")
+            if (GABAsynList.count()) {
+                recGABAa = new List()
+                recGABAb = new List()
+                if (varDt) {
+                    for i = 0, GABAsynList.count()-1 {
+                        recGABAa = expandList(recGABAa)
+                        cvode.record(&GABAsynList.o(i).i_a, recGABAa.o(i), rect)
+                        recGABAb = expandList(recGABAb)
+                        cvode.record(&GABAsynList.o(i).i_b, recGABAb.o(i), rect)
+                        count += 1
+                    }
+                } else {
+                    for i = 0, GABAsynList.count()-1 {
+                        recGABAa = expandList(recGABAa)
+                        recGABAa.o(i).record(&GABAsynList.o(i).i_a)
+                        recGABAb = expandList(recGABAb)
+                        recGABAb.o(i).record(&GABAsynList.o(i).i_b)
+                        count += 1
+                    }
+                }
+            }
+        }
+        GABAAsynList = $o1.getSynList("GABAa")
+        if (GABAAsynList.count()) {
+            if (object_id(recGABAa,1) == -1)  {
+                recGABAa = new List()
+            }
+            access cell.soma
+            if (varDt) {
+                for i = 0, GABAAsynList.count()-1 {
+                    recGABAa = expandList(recGABAa)
+                    cvode.record(&GABAAsynList.o(i).i, recGABAa.o(count+i), rect)
+                }
+            } else {
+                for i = 0, GABAAsynList.count()-1 {
+                    recGABAa = expandList(recGABAa)
+                    recGABAa.o(count+i).record(&GABAAsynList.o(i).i)
+                }
+            }
+        }
+    }
+}
+
+proc init() {
+    cell = $o1
+    access cell.soma
+    bigData = $3
+    if ($3 != 30) {
+        for (i = 609; i <= 689; i += 40) {
+            if (cell.gid == i) {
+                bigData = $3
+            }
+        }
+        if (bigData == 0) {
+            for (i = 759; i <= 839; i += 40) {
+                if (cell.gid == i) {
+                    bigData = $3
+                }
+            }
+        }
+    }
+    rect = new Vector()                                                     // record time
+    recv = new Vector()                                                     // record membrane potential
+
+    if (bigData == 10) {
+        dataVClamp = 1
+        dataNil = 1
+        dataExC = 1
+        dataIL = 1
+        dataINa = 1
+        dataIK = 1
+        dataICa = 1
+        dataIh = 1
+        dataICAN = 1
+        dataINaP = 1
+        dataIA = 1
+        dataIK1 = 1
+        dataIK2 = 1
+        dataIHVA = 1
+        dataGlu = 1
+        dataGABA = 1
+        dataIAHP = 1
+
+        if (dataVClamp && object_id($o2,1) != -1) {                         // Voltage clamp
+            recIVC = new Vector()                                           // record voltage clamp current
+            if (varDt) {
+                cvode.record(&$o2.i, recIVC, rect)
+            } else {
+                recIVC.record(&$o2.i)
+            }
+        }
+
+        if (dataNil) {                                                      // Basic data
+            recv = new Vector()                                             // record membrane potential
+            if (varDt) {
+                cvode.record(&cell.soma.v(0.5), recv, rect)
+            } else {
+                rect.record(&t)
+                recv.record(&cell.soma.v(0.5))
+            }
+        }
+
+        if (dataExC && !varDt) {                                            // Basic data 2
+            reci = new Vector()                                             // record total membrane current
+            if (varDt) {
+                cvode.record(&cell.soma.i_membrane(0.5), reci, rect)
+            } else {
+                reci.record(&cell.soma.i_membrane(0.5))
+            }
+        }
+
+        if (dataIL) {                                                       // Leak data
+            recIKleak = new Vector()                                        // record K+ leak current
+            recINaleak = new Vector()                                       // record Na+ leak current
+            if (varDt) {
+                cvode.record(&cell.soma.i_pas(0.5), recIKleak, rect)
+                cvode.record(&cell.soma.i_naleak(0.5), recINaleak, rect)
+            } else {
+                recIKleak.record(&cell.soma.i_pas(0.5))
+                recINaleak.record(&cell.soma.i_naleak(0.5))
+            }
+        }
+
+        if (dataINa) {                                                      // I_Na current data
+            recINa = new Vector()                                           // record Na+ current
+            recINam = new Vector()                                          // activation state
+            recINah = new Vector()                                          // inactivation state
+            if (varDt) {
+                cvode.record(&cell.soma.ina(0.5), recINa, rect)
+                cvode.record(&cell.soma.m_hhT(0.5), recINam, rect)
+                cvode.record(&cell.soma.h_hhT(0.5), recINah, rect)
+            } else {
+                recINa.record(&cell.soma.ina(0.5))
+                recINam.record(&cell.soma.m_hhT(0.5))
+                recINah.record(&cell.soma.h_hhT(0.5))
+            }
+        }
+
+        if (dataIK) {                                                       // I_K(DR) current data
+            recIK = new Vector()                                            // record K+ current
+            recIKn = new Vector()                                           // activation state
+            if (varDt) {
+                cvode.record(&cell.soma.ik(0.5), recIK, rect)
+                cvode.record(&cell.soma.n_hhT(0.5), recIKn, rect)
+            } else {
+                recIK.record(&cell.soma.ik(0.5))
+                recIKn.record(&cell.soma.n_hhT(0.5))
+            }
+        }
+
+        if (dataICa) {                                                      // Ca2+ current data
+            recCai = new Vector()                                           // record intracellular [Ca2+] associated to IT
+            recICa = new Vector()                                           // record Ca2+ current
+            recICam = new Vector()                                          // activation state
+            recICah = new Vector()                                          // inactivation state
+            if (varDt) {
+                cvode.record(&cell.soma.cai(0.5), recCai, rect)
+                cvode.record(&cell.soma.ica(0.5), recICa, rect)
+                // VB:
+                //cvode.record(&cell.soma.m_itGHK(0.5), recICam, rect)
+                //cvode.record(&cell.soma.h_itGHK(0.5), recICah, rect)
+                // LGN:
+                cvode.record(&cell.soma.m_it(0.5), recICam, rect)
+                cvode.record(&cell.soma.h_it(0.5), recICah, rect)
+            } else {
+                recCai.record(&cell.soma.cai(0.5))
+                recICa.record(&cell.soma.ica(0.5))
+                // VB:
+                //recICam.record(&cell.soma.m_itGHK(0.5))
+                //recICah.record(&cell.soma.h_itGHK(0.5))
+                // LGN:
+                recICam.record(&cell.soma.m_it(0.5))
+                recICah.record(&cell.soma.h_it(0.5))
+            }
+        }
+
+        if (dataIh) {                                                       // I_h current data
+            recIh = new Vector()                                            // record anomalous rectifier current
+            recIho1 = new Vector()                                          // normal activation state
+            recIho2 = new Vector()                                          // increased conductance activation state
+            recIhp1 = new Vector()                                          // proportion of bound calcium-binding (CB) protein
+            if (varDt) {
+                cvode.record(&cell.soma.ih(0.5), recIh, rect)
+                //cvode.record(&cell.soma.o1_iarg(0.5), recIho1, rect)
+                //cvode.record(&cell.soma.o2_iarg(0.5), recIho2, rect)
+                //cvode.record(&cell.soma.p1_iarg(0.5), recIhp1, rect)
+            } else {
+                recIh.record(&cell.soma.ih(0.5))
+                //recIho1.record(&cell.soma.o1_iarg(0.5))
+                //recIho2.record(&cell.soma.o2_iarg(0.5))
+                //recIhp1.record(&cell.soma.p1_iarg(0.5))
+            }
+        }
+
+        if (dataIAHP) {                                                     // I_AHP current data
+            recIAHP = new Vector()                                          // record Ca2+ activated hyperpolarising K+ current
+            recIAHPm1 = new Vector()                                        // record the fast activating component
+            recIAHPm2 = new Vector()                                        // record the slow activating component
+            if (varDt) {
+                //cvode.record(&cell.soma.ikb(0.5), recIAHP, rect)
+                //cvode.record(&cell.soma.m1_iahp(0.5), recIAHPm1, rect)
+                //cvode.record(&cell.soma.m2_iahp(0.5), recIAHPm2, rect)
+            } else {
+                //recIAHP.record(&cell.soma.ikb(0.5))
+                //recIAHPm1.record(&cell.soma.m1_iahp(0.5))
+                //recIAHPm2.record(&cell.soma.m2_iahp(0.5))
+            }
+        }
+
+        if (dataICAN) {                                                     // I_CAN current data
+            recICAN = new Vector()                                          // record nonspecific cation current CAN
+            recICANp1 = new Vector()                                        // levels of Ca2+-bound messenger protein
+            recICANo = new Vector()                                         // proportion of open channels
+            if (varDt) {
+                cvode.record(&cell.soma.in(0.5), recICAN, rect)
+                //cvode.record(&cell.soma.p1_ican(0.5), recICANp1, rect)
+                //cvode.record(&cell.soma.o_ican(0.5), recICANo, rect)
+                //cvode.record(&cell.soma.m_icand(0.5), recICANp1, rect)
+                cvode.record(&cell.soma.mCa_icanmTC(0.5), recICANp1, rect)
+                cvode.record(&cell.soma.hCa_icanmTC(0.5), recICANo, rect)
+            } else {
+                recICAN.record(&cell.soma.in(0.5))
+                //recICANp1.record(&cell.soma.p1_ican(0.5))
+                //recICANo.record(&cell.soma.o_ican(0.5))
+                //recICANp1.record(&cell.soma.m_icand(0.5))
+                recICANp1.record(&cell.soma.mCa_icanmTC(0.5))
+                recICANo.record(&cell.soma.hCa_icanmTC(0.5))
+            }
+        }
+
+        if (dataINaP) {
+            recINaPm = new Vector()
+            if (varDt) {
+                cvode.record(&cell.soma.m_inap(0.5), recINaPm, rect)
+            } else {
+                recINaPm.record(&cell.soma.m_inap(0.5))
+            }
+        }
+
+        if (dataIA) {                                                       // I_A current data
+            recIAm1 = new Vector()                                          // record the fast inactivating K+ current first activation component
+            recIAm2 = new Vector()                                          // the second activation component
+            recIAh1 = new Vector()                                          // the first inactivation component
+            recIAh2 = new Vector()                                          // the second inactivation component
+            if (varDt) {
+                cvode.record(&cell.soma.m1_ia(0.5), recIAm1, rect)
+                cvode.record(&cell.soma.m2_ia(0.5), recIAm2, rect)
+                cvode.record(&cell.soma.h1_ia(0.5), recIAh1, rect)
+                cvode.record(&cell.soma.h2_ia(0.5), recIAh2, rect)
+            } else {
+                recIAm1.record(&cell.soma.m1_ia(0.5))
+                recIAm2.record(&cell.soma.m2_ia(0.5))
+                recIAh1.record(&cell.soma.h1_ia(0.5))
+                recIAh2.record(&cell.soma.h2_ia(0.5))
+            }
+        }
+
+        if (dataIK1) {                                                      // I_K1 current data
+            recIK1m = new Vector()                                          // record the non-inactivating K+ current activation
+            if (varDt) {
+                cvode.record(&cell.soma.m_ik1(0.5), recIK1m, rect)
+            } else {
+                recIK1m.record(&cell.soma.m_ik1(0.5))
+            }
+        }
+
+        if (dataIK2) {                                                      // I_K2 current data
+            recIK2m = new Vector()                                          // record the slow inactivating K+ current activation component
+            recIK2h1 = new Vector()                                         // the first inactivation component
+            recIK2h2 = new Vector()                                         // the second inactivation component
+            if (varDt) {
+                cvode.record(&cell.soma.m_ik2(0.5), recIK2m, rect)
+                cvode.record(&cell.soma.h1_ik2(0.5), recIK2h1, rect)
+                cvode.record(&cell.soma.h2_ik2(0.5), recIK2h2, rect)
+            } else {
+                recIK2m.record(&cell.soma.m_ik2(0.5))
+                recIK2h1.record(&cell.soma.h1_ik2(0.5))
+                recIK2h2.record(&cell.soma.h2_ik2(0.5))
+            }
+        }
+
+        if (dataIHVA) {                                                     // I_HVA current data
+            recCahvai = new Vector()                                        // record intracellular [Ca2+] associated to IHVA
+            recIHVA = new Vector()                                          // record high threshold Ca2+ current
+            recIHVAm = new Vector()
+            if (varDt) {
+                cvode.record(&cell.soma.cahvai(0.5), recCahvai, rect)
+                cvode.record(&cell.soma.icahva(0.5), recIHVA, rect)
+                cvode.record(&cell.soma.m_ihvaTC(0.5), recIHVAm, rect)
+            } else {
+                recCahvai.record(&cell.soma.cahvai(0.5))
+                recIHVA.record(&cell.soma.icahva(0.5))
+                recIHVAm.record(&cell.soma.m_ihvaTC(0.5))
+            }
+        }
+
+        initGLUfull(cell)
+
+        initGABA(cell)
+
+    } else if (bigData == 11 || bigData == 20 || bigData == 50) {
+        if (varDt) {
+            cvode.record(&cell.soma.v(0.5), recv, rect)
+        } else {
+            rect.record(&t)
+            recv.record(&cell.soma.v(0.5))
+        }        
+    }
+}
+    
+proc save() {local i  localobj savData, dataMatrix
+	savData = new File()
+    savData.wopen($s1)
+    dataMatrix = new Matrix()
+    if (bigData == 10) {
+        if (varDt || varDt_local) {
+            subtract = 0
+            dataMatrix.resize(47, rect.size())
+            if (object_id(rect,1) != -1)       { dataMatrix.setrow(0,  rect) }
+        } else {
+            subtract = 1
+            dataMatrix.resize(46, rect.size())
+        }
+        if (object_id(recv,1) != -1)       { dataMatrix.setrow(1-subtract,  recv) }
+        if (object_id(recIVC,1) != -1)     { dataMatrix.setrow(2-subtract,  recIVC) }
+        if (object_id(reci,1) != -1)       { dataMatrix.setrow(3-subtract,  reci) }
+        if (object_id(recIKleak,1) != -1)  { dataMatrix.setrow(4-subtract,  recIKleak) }
+        if (object_id(recINaleak,1) != -1) { dataMatrix.setrow(5-subtract,  recINaleak) }
+        if (object_id(recINa,1) != -1)     { dataMatrix.setrow(6-subtract,  recINa) }
+        if (object_id(recINam,1) != -1)    { dataMatrix.setrow(7-subtract,  recINam) }
+        if (object_id(recINah,1) != -1)    { dataMatrix.setrow(8-subtract,  recINah) }
+        if (object_id(recIK,1) != -1)      { dataMatrix.setrow(9-subtract,  recIK) }
+        if (object_id(recIKn,1) != -1)     { dataMatrix.setrow(10-subtract, recIKn) }
+        if (object_id(recCai,1) != -1)     { dataMatrix.setrow(11-subtract, recCai) }
+        if (object_id(recCahvai,1) != -1)  { dataMatrix.setrow(12-subtract, recCahvai) }
+        if (object_id(recICa,1) != -1)     { dataMatrix.setrow(13-subtract, recICa) }
+        if (object_id(recICam,1) != -1)    { dataMatrix.setrow(14-subtract, recICam) }
+        if (object_id(recICah,1) != -1)    { dataMatrix.setrow(15-subtract, recICah) }
+        if (object_id(recIh,1) != -1)      { dataMatrix.setrow(16-subtract, recIh) }
+        if (object_id(recIho1,1) != -1)    { dataMatrix.setrow(17-subtract, recIho1) }
+        if (object_id(recIho2,1) != -1)    { dataMatrix.setrow(18-subtract, recIho2) }
+        if (object_id(recIhp1,1) != -1)    { dataMatrix.setrow(19-subtract, recIhp1) }
+        if (object_id(recIAHP,1) != -1)    { dataMatrix.setrow(20-subtract, recIAHP) }
+        if (object_id(recIAHPm1,1) != -1)  { dataMatrix.setrow(21-subtract, recIAHPm1) }
+        if (object_id(recIAHPm2,1) != -1)  { dataMatrix.setrow(22-subtract, recIAHPm2) }
+        if (object_id(recICAN,1) != -1)    { dataMatrix.setrow(23-subtract, recICAN) }
+        if (object_id(recICANp1,1) != -1)  { dataMatrix.setrow(24-subtract, recICANp1) }
+        if (object_id(recICANo,1) != -1)   { dataMatrix.setrow(25-subtract, recICANo) }
+        if (object_id(recINaPm,1) != -1)   { dataMatrix.setrow(26-subtract, recINaPm) }
+        if (object_id(recIAm1,1) != -1)    { dataMatrix.setrow(27-subtract, recIAm1) }
+        if (object_id(recIAm2,1) != -1)    { dataMatrix.setrow(28-subtract, recIAm2) }
+        if (object_id(recIAh1,1) != -1)    { dataMatrix.setrow(29-subtract, recIAh1) }
+        if (object_id(recIAh2,1) != -1)    { dataMatrix.setrow(30-subtract, recIAh2) }
+        if (object_id(recIK1m,1) != -1)    { dataMatrix.setrow(31-subtract, recIK1m) }
+        if (object_id(recIK2m,1) != -1)    { dataMatrix.setrow(32-subtract, recIK2m) }
+        if (object_id(recIK2h1,1) != -1)   { dataMatrix.setrow(33-subtract, recIK2h1) }
+        if (object_id(recIK2h2,1) != -1)   { dataMatrix.setrow(34-subtract, recIK2h2) }
+        if (object_id(recIHVA,1) != -1)    { dataMatrix.setrow(35-subtract, recIHVA) }
+        if (object_id(recIHVAm,1) != -1)   { dataMatrix.setrow(36-subtract, recIHVAm) }
+        if (object_id(recAMPA,1) != -1)    {
+            for i = 1, recAMPA.count()-1 {
+                { recAMPA.o(0).add(recAMPA.o(i)) }
+                { recNMDA.o(0).add(recNMDA.o(i)) }
+            }
+            dataMatrix.setrow(37-subtract, recAMPA.o(0))
+            dataMatrix.setrow(38-subtract, recNMDA.o(0))
+        }
+        if (object_id(recmGluR1a,1) != -1) {
+            for i = 1, recmGluR1a.count()-1 {
+                { recmGluR1a.o(0).add(recmGluR1a.o(i)) }
+                { recmGluR1a_R.o(0).add(recmGluR1a_R.o(i)) }
+                { recmGluR1a_G.o(0).add(recmGluR1a_G.o(i)) }
+            }
+            dataMatrix.setrow(39-subtract, recmGluR1a.o(0))
+            dataMatrix.setrow(4-subtract,  recmGluR1a.o(0))
+            dataMatrix.setrow(40-subtract, recmGluR1a_R.o(0))
+            dataMatrix.setrow(41-subtract, recmGluR1a_G.o(0))
+        }
+        if (object_id(recGABAa,1) != -1)   {
+            for i = 1, recGABAa.count()-1 {
+                { recGABAa.o(0).add(recGABAa.o(i)) }
+            }
+            dataMatrix.setrow(42-subtract, recGABAa.o(0))
+        }
+        if (object_id(recGABAb,1) != -1)   {
+            for i = 1, recGABAb.count()-1 {
+                { recGABAb.o(0).add(recGABAb.o(i)) }
+            }
+            dataMatrix.setrow(43-subtract, recGABAb.o(0))
+        }
+        if (object_id(receGABAa,1) != -1) {
+            for i = 1, receGABAa.count()-1 {
+                { receGABAa.o(0).add(receGABAa.o(i)) }
+                { receGABAa_R.o(0).add(receGABAa_R.o(i)) }
+                { receGABAa_G.o(0).add(receGABAa_G.o(i)) }
+            }
+            dataMatrix.setrow(44-subtract, receGABAa.o(0))
+            if (object_id(recmGluR1a,1) != -1) {
+                dataMatrix.setrow(4,  recmGluR1a.o(0).add(receGABAa.o(0)))
+            }
+            dataMatrix.setrow(45-subtract, receGABAa_R.o(0))
+            dataMatrix.setrow(46-subtract, receGABAa_G.o(0))
+        }
+    } else if (bigData == 11 || bigData == 20 || bigData == 50) {
+        if (varDt || varDt_local) {
+            dataMatrix.resize(2, rect.size())
+            if (object_id(rect,1) != -1)       { dataMatrix.setrow(0,  rect) }
+            if (object_id(recv,1) != -1)       { dataMatrix.setrow(1,  recv) }
+        } else {
+            dataMatrix.resize(1, rect.size())
+            if (object_id(recv,1) != -1)       { dataMatrix.setrow(0,  recv) }
+        }
+    }
+    dataMatrix.fprint(savData, "%g\t")
+    savData.close()
+}
+
+endtemplate TCdata

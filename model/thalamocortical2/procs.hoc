@@ -1,0 +1,575 @@
+// Custom general routines
+
+
+
+/*  A function for rounding numbers. Input:
+    $1 - a number to be rounded. */
+    func round() {
+        if ($1 >= 0) {
+            if ($1-int($1) < 0.5) {
+                return int($1)
+            } else {
+                return int($1)+1
+            }
+        } else {
+            if (int($1)-$1 < 0.5) {
+                return int($1)
+            } else {
+                return int($1)-1
+            }
+        }
+    }
+
+
+
+/*  A function to return the remainder after division. Input:
+    $1 - numerator;
+    $2 - denominator.
+    func remainder() {local integer, rem
+        integer = $1-int($1/$2)*$2
+        return integer
+    }
+
+
+
+/*  A function returning a minimum value of two. Input:
+    $1 - value #1;
+    $2 - value #2. */
+    func min() {local minValue
+        if ($1 > $2) {
+            minValue = $2
+        } else {
+            minValue = $1
+        }
+        return minValue
+    }
+
+
+
+/*  A function returning a maximum value of two. Input:
+    $1 - value #1;
+    $2 - value #2. */
+    func max() {local maxValue
+        if ($1 >= $2) {
+            maxValue = $1
+        } else {
+            maxValue = $2
+        }
+        return maxValue
+    }
+
+
+
+/*  An object function returning a vector with a non-repeating pseudo
+    random sequence of integers. Input:
+    $o1 - an object of a Random() class type;
+    $2  - the starting integer;
+    $3  - the ending integer. */
+    obfunc randExhaust() {local seqLength, i, a, inVec  localobj r, vec
+        vec = new Vector()
+        vec.append($o1.discunif($2, $3))
+        i = 1
+        while (i <= $3-$2) {
+            a = $o1.repick()
+            inVec = vec.contains(a)
+            if (!inVec) {
+                vec.append(a)
+                i += 1
+            }
+        }
+        return vec
+    }
+
+
+
+/*  An object function returning a vector of integer sequence starting with
+    $1 and finishing with $3 at increments of size $2. Input:
+    $1 - the starting integer;
+    $2 - the step size;
+    $3 - the ending integer. */
+    obfunc vecIncrement() {local i  localobj vec
+        vec = new Vector()
+        for (i = $1; i <= $3; i += $2) {
+            vec.append(i)
+        }
+        return vec
+    }
+
+
+
+/*  An object function for expanding a list with an additional vector. Input:
+    $o1 - a list to be expanded. */
+    obfunc expandList() {localobj vec
+        vec = new Vector()
+        $o1.append(vec)
+        return $o1
+    }
+
+
+
+/*  A function for repicking a random number from the normal distrobution
+    with mu = 0 and sd = 1. Input:
+    $o1 - a random variable Random(). */
+    func normRepick() {local x
+        x = $o1.repick()
+            while (x < -1.96 || x > 1.96) {
+            	x = $o1.repick()
+            }
+        return x
+    }
+
+
+
+/*  A function converting a system time string (in nS) into a number (in
+    uS). Input:
+    $s1 - the string for conversion. */
+    func str2numTime() {local num  localobj strobj
+        strdef strTrim, strEl
+        strobj = new StringFunctions()
+        strTrim = $s1
+        strobj.left(strTrim, 16)
+        num = 0
+        for i = 0, strobj.len(strTrim)-1 {
+            strEl = strTrim
+            strobj.left(strEl, strobj.len(strTrim)-i)
+            strobj.right(strEl, strobj.len(strTrim)-1-i)
+            if (!strcmp(strEl,"1")) {
+                num = num + 10^i
+            } else if (!strcmp(strEl,"2")) { 
+                num = num + 2*10^i
+            } else if (!strcmp(strEl,"3")) {
+                num = num + 3*10^i
+            } else if (!strcmp(strEl,"4")) {
+                num = num + 4*10^i
+            } else if (!strcmp(strEl,"5")) {
+                num = num + 5*10^i
+            } else if (!strcmp(strEl,"6")) {
+                num = num + 6*10^i
+            } else if (!strcmp(strEl,"7")) {
+                num = num + 7*10^i
+            } else if (!strcmp(strEl,"8")) {
+                num = num + 8*10^i
+            } else if (!strcmp(strEl,"9")) {
+                num = num + 9*10^i
+            }
+        }
+        return num
+    }
+
+
+
+//  A procedure for turning on variable time step integration.
+    proc cvodeActive() {
+        using_cvode_ = 1
+        cvode.use_long_double(1)
+        cvode_active(1)
+        if (varDt_local) {
+            cvode_local(1)
+            //cvode.condition_order(2)
+        }
+        //cvode.dae_init_dteps(1e-9,2)
+        //cvode.cache_efficient(1)
+    }
+
+
+
+//  An object function for bringing up the error tolerance estimation tool.
+    obfunc atoltool() {localobj atoltool_
+        atoltool_ = new AtolTool()
+        if (!cvode.active) {
+            cvodeActive()
+        }
+        atoltool_.activate(1)
+        execute("init()")
+        atoltool_.analyse()
+        atoltool_.map()
+        return atoltool_
+    }
+
+
+
+/*  An object function for inserting a simple current clamp. Inputs:
+    $o1 - a cell to be clamped;
+    $2  - delay (ms);
+    $3  - duration (ms);
+    $4  - amplitude (nA);
+    $s5 - a string refering to a cell compartment - either "soma" or "dend". */
+    obfunc stimSingle() {localobj cell, stim
+        cell = $o1
+        if (!strcmp($s5,"soma")) {
+            access cell.soma
+        } else if (!strcmp($s5,"dend")) {
+            access cell.dend
+        }
+        stim = new IClamp(.5)
+        stim.del = $2
+        stim.dur = $3
+        stim.amp = $4
+        return stim
+    }
+
+
+
+/*  A procedure for changing parameters of an already inserted simple
+    current clamp . Inputs:
+    $o1 - a current clamp object;
+    $2  - delay (ms);
+    $3  - duration (ms);
+    $4  - amplitude (nA). */
+    proc stimSingleAdj() {
+        $o1.del = $2
+        $o1.dur = $3
+        $o1.amp = $4
+    }
+
+
+
+/*  An object function for inserting a 30-step current clamp. Inputs:
+    $o1 - a cell to be clamped;
+    $2  - 1st pulse duration (ms);
+    $3  - 2nd pulse duration (ms);
+    $4  - 3rd pulse duration (ms);
+    $5  - 4th pulse duration (ms);
+    $6  - 5th pulse duration (ms);
+    $7  - 6th pulse duration (ms);
+    $8  - 7th pulse duration (ms);
+    $9  - 8th pulse duration (ms);
+    $10 - 9th pulse duration (ms);
+    $11 - 10th pulse duration (ms);
+    $12 - 11th pulse duration (ms);
+    $13 - 12th pulse duration (ms);
+    $14 - 13th pulse duration (ms);
+    $15 - 14th pulse duration (ms);
+    $16 - 15th pulse duration (ms);
+    $17 - 16th pulse duration (ms);
+    $18 - 17th pulse duration (ms);
+    $19 - 18th pulse duration (ms);
+    $20 - 19th pulse duration (ms);
+    $21 - 20th pulse duration (ms);
+    $22 - 21th pulse duration (ms);
+    $23 - 22th pulse duration (ms);
+    $24 - 23th pulse duration (ms);
+    $25 - 24th pulse duration (ms);
+    $26 - 25th pulse duration (ms);
+    $27 - 26th pulse duration (ms);
+    $28 - 27th pulse duration (ms);
+    $29 - 28th pulse duration (ms);
+    $30 - 29th pulse duration (ms);
+    $31 - 30th pulse duration (ms);
+    $32 - 1st pulse amplitude (nA);
+    $33 - 2nd pulse amplitude (nA);
+    $34 - 3rd pulse amplitude (nA);
+    $35 - 4th pulse amplitude (nA);
+    $36 - 5th pulse amplitude (nA);
+    $37 - 6th pulse amplitude (nA);
+    $38 - 7th pulse amplitude (nA);
+    $39 - 8th pulse amplitude (nA);
+    $40 - 9th pulse amplitude (nA);
+    $41 - 10th pulse amplitude (nA);
+    $42 - 11th pulse amplitude (nA);
+    $43 - 12th pulse amplitude (nA);
+    $44 - 13th pulse amplitude (nA);
+    $45 - 14th pulse amplitude (nA);
+    $46 - 15th pulse amplitude (nA);
+    $47 - 16th pulse amplitude (nA);
+    $48 - 17th pulse amplitude (nA);
+    $49 - 18th pulse amplitude (nA);
+    $50 - 19th pulse amplitude (nA);
+    $51 - 20th pulse amplitude (nA);
+    $52 - 21th pulse amplitude (nA);
+    $53 - 22th pulse amplitude (nA);
+    $54 - 23th pulse amplitude (nA);
+    $55 - 24th pulse amplitude (nA);
+    $56 - 25th pulse amplitude (nA);
+    $57 - 26th pulse amplitude (nA);
+    $58 - 27th pulse amplitude (nA);
+    $59 - 28th pulse amplitude (nA);
+    $60 - 29th pulse amplitude (nA);
+    $61 - 30th pulse amplitude (nA). */
+    obfunc stimFamily() {localobj cell, stim
+        cell = $o1
+        access cell.soma
+        stim = new IClampFamily(.5)
+        stim.dur1  = $2
+        stim.dur2  = $3
+        stim.dur3  = $4
+        stim.dur4  = $5
+        stim.dur5  = $6
+        stim.dur6  = $7
+        stim.dur7  = $8
+        stim.dur8  = $9
+        stim.dur9  = $10
+        stim.dur10 = $11
+        stim.dur11 = $12
+        stim.dur12 = $13
+        stim.dur13 = $14
+        stim.dur14 = $15
+        stim.dur15 = $16
+        stim.dur16 = $17
+        stim.dur17 = $18
+        stim.dur18 = $19
+        stim.dur19 = $20
+        stim.dur20 = $21
+        stim.dur21 = $22
+        stim.dur22 = $23
+        stim.dur23 = $24
+        stim.dur24 = $25
+        stim.dur25 = $26
+        stim.dur26 = $27
+        stim.dur27 = $28
+        stim.dur28 = $29
+        stim.dur29 = $30
+        stim.dur30 = $31
+        stim.amp1  = $32
+        stim.amp2  = $33
+        stim.amp3  = $34
+        stim.amp4  = $35
+        stim.amp5  = $36
+        stim.amp6  = $37
+        stim.amp7  = $38
+        stim.amp8  = $39
+        stim.amp9  = $40
+        stim.amp10 = $41
+        stim.amp11 = $42
+        stim.amp12 = $43
+        stim.amp13 = $44
+        stim.amp14 = $45
+        stim.amp15 = $46
+        stim.amp16 = $47
+        stim.amp17 = $48
+        stim.amp18 = $49
+        stim.amp19 = $50
+        stim.amp20 = $51
+        stim.amp21 = $52
+        stim.amp22 = $53
+        stim.amp23 = $54
+        stim.amp24 = $55
+        stim.amp25 = $56
+        stim.amp26 = $57
+        stim.amp27 = $58
+        stim.amp28 = $59
+        stim.amp29 = $60
+        stim.amp30 = $61
+        return stim
+    }
+
+
+
+/*  A procedure for changing parameters of an already inserted five-step
+    current clamp. Inputs:
+    $o1 - a current clamp object;
+    $2  - 1st pulse duration (ms);
+    $3  - 2nd pulse duration (ms);
+    $4  - 3rd pulse duration (ms);
+    $5  - 4th pulse duration (ms);
+    $6  - 5th pulse duration (ms);
+    $7  - 6th pulse duration (ms);
+    $8  - 7th pulse duration (ms);
+    $9  - 8th pulse duration (ms);
+    $10 - 9th pulse duration (ms);
+    $11 - 10th pulse duration (ms);
+    $12 - 11th pulse duration (ms);
+    $13 - 12th pulse duration (ms);
+    $14 - 13th pulse duration (ms);
+    $15 - 14th pulse duration (ms);
+    $16 - 15th pulse duration (ms);
+    $17 - 16th pulse duration (ms);
+    $18 - 17th pulse duration (ms);
+    $19 - 18th pulse duration (ms);
+    $20 - 19th pulse duration (ms);
+    $21 - 20th pulse duration (ms);
+    $22 - 21th pulse duration (ms);
+    $23 - 22th pulse duration (ms);
+    $24 - 23th pulse duration (ms);
+    $25 - 24th pulse duration (ms);
+    $26 - 25th pulse duration (ms);
+    $27 - 26th pulse duration (ms);
+    $28 - 27th pulse duration (ms);
+    $29 - 28th pulse duration (ms);
+    $30 - 29th pulse duration (ms);
+    $31 - 30th pulse duration (ms);
+    $32 - 1st pulse amplitude (nA);
+    $33 - 2nd pulse amplitude (nA);
+    $34 - 3rd pulse amplitude (nA);
+    $35 - 4th pulse amplitude (nA);
+    $36 - 5th pulse amplitude (nA);
+    $37 - 6th pulse amplitude (nA);
+    $38 - 7th pulse amplitude (nA);
+    $39 - 8th pulse amplitude (nA);
+    $40 - 9th pulse amplitude (nA);
+    $41 - 10th pulse amplitude (nA);
+    $42 - 11th pulse amplitude (nA);
+    $43 - 12th pulse amplitude (nA);
+    $44 - 13th pulse amplitude (nA);
+    $45 - 14th pulse amplitude (nA);
+    $46 - 15th pulse amplitude (nA);
+    $47 - 16th pulse amplitude (nA);
+    $48 - 17th pulse amplitude (nA);
+    $49 - 18th pulse amplitude (nA);
+    $50 - 19th pulse amplitude (nA);
+    $51 - 20th pulse amplitude (nA);
+    $52 - 21th pulse amplitude (nA);
+    $53 - 22th pulse amplitude (nA);
+    $54 - 23th pulse amplitude (nA);
+    $55 - 24th pulse amplitude (nA);
+    $56 - 25th pulse amplitude (nA);
+    $57 - 26th pulse amplitude (nA);
+    $58 - 27th pulse amplitude (nA);
+    $59 - 28th pulse amplitude (nA);
+    $60 - 29th pulse amplitude (nA);
+    $61 - 30th pulse amplitude (nA). */
+    proc stimFamilyAdj() {
+        $o1.dur1  = $2
+        $o1.dur2  = $3
+        $o1.dur3  = $4
+        $o1.dur4  = $5
+        $o1.dur5  = $6
+        $o1.dur6  = $7
+        $o1.dur7  = $8
+        $o1.dur8  = $9
+        $o1.dur9  = $10
+        $o1.dur10 = $11
+        $o1.dur11 = $12
+        $o1.dur12 = $13
+        $o1.dur13 = $14
+        $o1.dur14 = $15
+        $o1.dur15 = $16
+        $o1.dur16 = $17
+        $o1.dur17 = $18
+        $o1.dur18 = $19
+        $o1.dur19 = $20
+        $o1.dur20 = $21
+        $o1.dur21 = $22
+        $o1.dur22 = $23
+        $o1.dur23 = $24
+        $o1.dur24 = $25
+        $o1.dur25 = $26
+        $o1.dur26 = $27
+        $o1.dur27 = $28
+        $o1.dur28 = $29
+        $o1.dur29 = $30
+        $o1.dur30 = $31
+        $o1.amp1  = $32
+        $o1.amp2  = $33
+        $o1.amp3  = $34
+        $o1.amp4  = $35
+        $o1.amp5  = $36
+        $o1.amp6  = $37
+        $o1.amp7  = $38
+        $o1.amp8  = $39
+        $o1.amp9  = $40
+        $o1.amp10 = $41
+        $o1.amp11 = $42
+        $o1.amp12 = $43
+        $o1.amp13 = $44
+        $o1.amp14 = $45
+        $o1.amp15 = $46
+        $o1.amp16 = $47
+        $o1.amp17 = $48
+        $o1.amp18 = $49
+        $o1.amp19 = $50
+        $o1.amp20 = $51
+        $o1.amp21 = $52
+        $o1.amp22 = $53
+        $o1.amp23 = $54
+        $o1.amp24 = $55
+        $o1.amp25 = $56
+        $o1.amp26 = $57
+        $o1.amp27 = $58
+        $o1.amp28 = $59
+        $o1.amp29 = $60
+        $o1.amp30 = $61
+    }
+
+
+
+/*  An object function for inserting a voltage clamp. Inputs:
+    $o1 - a cell to be clamped;
+    $2  - 1st clamp stage duration (ms);
+    $3  - 2nd clamp stage duration (ms);
+    $4  - 3rd clamp stage duration (ms);
+    $5  - 1st clamp stage voltage (nA);
+    $6  - 2nd clamp stage voltage (nA);
+    $7  - 3rd clamp stage voltage (nA). */
+    obfunc vClamp() {localobj cell, vClamp
+        cell = $o1
+        access cell.soma
+        vClamp = new SEClamp(.5)
+        vClamp.dur1 = $2
+        vClamp.dur2 = $3
+        vClamp.dur3 = $4
+        vClamp.amp1 = $5
+        vClamp.amp2 = $6
+        vClamp.amp3 = $7
+        vClamp.rs = 1e-9
+        return vClamp
+    }
+
+
+
+/*  A procedure for changing parameters of an already inserted voltage
+    clamp. Inputs:
+    $o1 - a voltage clamp object;
+    $2  - 1st clamp stage duration (ms);
+    $3  - 2nd clamp stage duration (ms);
+    $4  - 3rd clamp stage duration (ms);
+    $5  - 1st clamp stage voltage (nA);
+    $6  - 2nd clamp stage voltage (nA);
+    $7  - 3rd clamp stage voltage (nA). */
+    proc vClampAdj() {
+        $o1.dur1 = $2
+        $o1.dur2 = $3
+        $o1.dur3 = $4
+        $o1.amp1 = $5
+        $o1.amp2 = $6
+        $o1.amp3 = $7
+    }
+
+
+
+/*  An object function for inserting a delayed voltage clamp. Inputs:
+    $o1 - a cell to be clamped;
+    $2  - delay duration (ms);
+    $3  - 1st clamp stage duration (ms);
+    $4  - 2nd clamp stage duration (ms);
+    $5  - 1st clamp stage voltage (nA);
+    $6  - 2nd clamp stage voltage (nA). */
+    obfunc delClamp() {localobj cell, vClamp
+        cell = $o1
+        access cell.soma
+        vClamp = new SEVClamp(.5)
+        vClamp.dur1 = $2
+        vClamp.dur2 = $3
+        vClamp.dur3 = $4
+        vClamp.amp1 = 0
+        vClamp.amp2 = $5
+        vClamp.amp3 = $6
+        vClamp.rs = 1e-9
+        return vClamp
+    }
+
+
+
+/*  A procedure for changing parameters of an already inserted delayed
+    voltage clamp. Inputs:
+    $o1 - a voltage clamp object;
+    $2  - delay duration (ms);
+    $3  - 1st clamp stage duration (ms);
+    $4  - 2nd clamp stage duration (ms);
+    $5  - 1st clamp stage voltage (nA);
+    $6  - 2nd clamp stage voltage (nA). */
+    proc delClampAdj() {
+        $o1.dur1 = $2
+        $o1.dur2 = $3
+        $o1.dur3 = $4
+        $o1.amp1 = 0
+        $o1.amp2 = $5
+        $o1.amp3 = $6
+    }
+
+
+
+//  The lambda segmentation rule.
+    func lambda_f() {   // $1 - frequency
+        return 1e5*sqrt(diam/(4*PI*$1*Ra*cm))
+    }

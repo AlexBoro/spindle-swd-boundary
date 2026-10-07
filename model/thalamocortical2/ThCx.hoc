@@ -1,0 +1,268 @@
+// Perform thalamocortex-related computing and simulation routines
+
+{ load_file("Cx.hoc") }
+{ load_file("Th.hoc") }
+
+
+
+objref nc_TC_L4PY_FO, nc_TC_L4IN_FO
+objref nc_TC_L5PY_FO, nc_TC_L5IN_FO
+objref nc_L6PY_TC_FO, TCminisAMPAList, ncTCminisAMPAout_FO, ncNRTminisAMPAout_FO, nc_L6PY_NRT_FO
+objref nc_TC_L23PY_HO, nc_TC_L23IN_HO
+objref nc_TC_L4PY_HO, nc_TC_L4IN_HO
+objref nc_TC_L5PY_HO, nc_TC_L5IN_HO, nc_L5PY_TC_HO, ncTCminisAMPAout_HO2
+objref nc_TC_L6PY_HO, nc_TC_L6IN_HO, nc_L6PY_TC_HO, ncTCminisAMPAout_HO, ncNRTminisAMPAout_HO, nc_L6PY_NRT_HO
+ratio_TC_L4PY_FO = 0.16 //0.10
+ratio_TC_L5PY_FO = 0.16 //0.10
+ratio_TC_L23PY_HO = 0.32 //0.20
+ratio_TC_L4PY_HO = 0.32 //0.20
+ratio_TC_L5PY_HO = 0.32 //0.20
+ratio_TC_L6PY_HO = 0.32 //0.20
+ratio_TC_L4IN_FO = 0.04
+ratio_TC_L5IN_FO = 0.04
+ratio_TC_L23IN_HO = 0.08
+ratio_TC_L4IN_HO = 0.08
+ratio_TC_L5IN_HO = 0.08
+ratio_TC_L6IN_HO = 0.08
+ratio_L6PY_TCFO = 0.10
+ratio_L6PY_TCHO = 0.10
+ratio_L6PY_NRT = 0.10
+ratio_L5PY_TC = 0.01
+koef = 1
+koefWeiTCfoCx = 1
+koefWeiTChoCx = 1
+koefWeiCxTh = 1
+koefWeiP_L4_FO = koef*koefWeiTCfoCx*10*0.7
+koefWeiP_L5_FO = koef*koefWeiTCfoCx*1*0.7
+koefWeiP_L23_HO = koef*koefWeiTChoCx*3*0.7
+koefWeiP_L4_HO = koef*koefWeiTChoCx*1*0.7
+koefWeiP_L5_HO = koef*koefWeiTChoCx*5*0.7
+koefWeiP_L6_HO = koef*koefWeiTChoCx*3*0.7
+koefWeiN_L4_FO = koef*koefWeiTCfoCx*10*0.7
+koefWeiN_L5_FO = koef*koefWeiTCfoCx*1*0.7
+koefWeiN_L23_HO = koef*koefWeiTChoCx*3*0.7
+koefWeiN_L4_HO = koef*koefWeiTChoCx*1*0.7
+koefWeiN_L5_HO = koef*koefWeiTChoCx*5*0.7
+koefWeiN_L6_HO = koef*koefWeiTChoCx*3*0.7
+koefWeiTCFO = koef*koefWeiCxTh*1*0.09
+koefWeiTCHO = koef*koefWeiCxTh*1*0.09
+koefWeiNRT = koef*koefWeiCxTh*3*0.044
+koefWeiL5TC = koef*koefWeiCxTh*5*0.09
+connectIN = 1
+synSpread_ThCx = 1
+synSpread_CxTh = 1
+P_release_ThCx = 0.8
+
+
+
+proc connectStructs() {local i  localobj amps, ncTCminisAMPAout
+    // TC_FO-->L4,L5:
+    if (isFO) {
+        nc_TC_L4PY_FO = connect2pops(ratio_TC_L4PY_FO, 4, koefWeiP_L4_FO*$1, cellLists_FO.o(1), gidLists_FO.o(1), \
+                            cellLists_L4.o(8), gidLists_L4.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        nc_TC_L5PY_FO = connect2pops(ratio_TC_L5PY_FO, 4, koefWeiP_L5_FO*$1, cellLists_FO.o(1), gidLists_FO.o(1), \
+                            cellLists_L5.o(8), gidLists_L5.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        // TC-->L4IN,L5IN:
+        if (connectIN) {
+            nc_TC_L4IN_FO = connect2pops(ratio_TC_L4IN_FO, 4, koefWeiN_L4_FO*$2, cellLists_FO.o(1), gidLists_FO.o(1), \
+                                cellLists_L4.o(9), gidLists_L4.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+            nc_TC_L5IN_FO = connect2pops(ratio_TC_L5IN_FO, 4, koefWeiN_L5_FO*$2, cellLists_FO.o(1), gidLists_FO.o(1), \
+                                cellLists_L5.o(9), gidLists_L5.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        }
+    }
+    
+    // TC_HO-->L2/3,L4,L5, L6:
+    if (isHO) {
+        nc_TC_L23PY_HO = connect2pops(ratio_TC_L23PY_HO, 6, koefWeiP_L23_HO*$1, cellLists_HO.o(1), gidLists_HO.o(1), \
+                            cellLists_L23.o(8), gidLists_L23.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        nc_TC_L4PY_HO = connect2pops(ratio_TC_L4PY_HO, 6, koefWeiP_L4_HO*$1, cellLists_HO.o(1), gidLists_HO.o(1), \
+                            cellLists_L4.o(8), gidLists_L4.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        nc_TC_L5PY_HO = connect2pops(ratio_TC_L5PY_HO, 6, koefWeiP_L5_HO*$1, cellLists_HO.o(1), gidLists_HO.o(1), \
+                            cellLists_L5.o(8), gidLists_L5.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        nc_TC_L6PY_HO = connect2pops(ratio_TC_L6PY_HO, 6, koefWeiP_L6_HO*$1, cellLists_HO.o(1), gidLists_HO.o(1), \
+                            cellLists_L6.o(8), gidLists_L6.o(8), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        // TC-->L2/3IN,L4IN,L5IN:
+        if (connectIN) {
+            nc_TC_L23IN_HO = connect2pops(ratio_TC_L23IN_HO, 6, koefWeiN_L23_HO*$2, cellLists_HO.o(1), gidLists_HO.o(1), \
+                                cellLists_L23.o(9), gidLists_L23.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+            nc_TC_L4IN_HO = connect2pops(ratio_TC_L4IN_HO, 6, koefWeiN_L4_HO*$2, cellLists_HO.o(1), gidLists_HO.o(1), \
+                                cellLists_L4.o(9), gidLists_L4.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+            nc_TC_L5IN_HO = connect2pops(ratio_TC_L5IN_HO, 6, koefWeiN_L5_HO*$2, cellLists_HO.o(1), gidLists_HO.o(1), \
+                                cellLists_L5.o(9), gidLists_L5.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+            nc_TC_L6IN_HO = connect2pops(ratio_TC_L6IN_HO, 6, koefWeiN_L6_HO*$2, cellLists_HO.o(1), gidLists_HO.o(1), \
+                                cellLists_L6.o(9), gidLists_L6.o(9), synSpread_ThCx, P_release_ThCx, amps, edge, "GLU")
+        }
+    }
+
+    // L6PY-->TC_FO:
+    if (isFO) {
+        createSyns(cellLists_FO.o(1), nodeGidLists_FO.o(1), "AMPA", P_release_Th, amps, pc)
+        nc_L6PY_TC_FO = connect2pops(ratio_L6PY_TCFO, 4, koefWeiTCFO*$3, cellLists_L6.o(8), gidLists_L6.o(8), \
+                            cellLists_FO.o(1), gidLists_FO.o(1), synSpread_CxTh, P_release_ThCx, amps, edge, "GLUfull")
+        if (randomise.x[4]) {
+            weight = 0.04  // 0.04: ~0.2mV
+            ncTCminisAMPAout_FO = connectMinis(cellLists_FO.o(1), 0.6, weight, "AMPA")
+            nc_L6PY_TC_FO.append(ncTCminisAMPAout_FO)
+        }
+    }
+    if (isHO) {
+        createSyns(cellLists_HO.o(1), nodeGidLists_HO.o(1), "AMPA", P_release_Th, amps, pc)
+        nc_L6PY_TC_HO = connect2pops(ratio_L6PY_TCHO, 4, koefWeiTCHO*$3, cellLists_L6.o(8), gidLists_L6.o(8), \
+                            cellLists_HO.o(1), gidLists_HO.o(1), synSpread_CxTh, P_release_ThCx, amps, edge, "GLUfull")
+        if (randomise.x[4]) {
+            weight = 0.04  // 0.04: ~0.2mV
+            ncTCminisAMPAout_HO = connectMinis(cellLists_HO.o(1), 0.6, weight, "AMPA")
+            nc_L6PY_TC_HO.append(ncTCminisAMPAout_HO)
+        }
+    }
+
+    // L6PY-->NRT:
+    if (isFO) {
+        nc_L6PY_NRT_FO = connect2pops(ratio_L6PY_NRT, 8, koefWeiNRT*$4, cellLists_L6.o(8), gidLists_L6.o(8), \
+                            cellLists_FO.o(4), gidLists_FO.o(4), synSpread_CxTh, P_release_ThCx, amps, edge, "GLUfull")
+    }
+    if (isHO) {
+        nc_L6PY_NRT_HO = connect2pops(ratio_L6PY_NRT, 8, koefWeiNRT*$4, cellLists_L6.o(8), gidLists_L6.o(8), \
+                            cellLists_HO.o(4), gidLists_HO.o(4), synSpread_CxTh, P_release_ThCx, amps, edge, "GLUfull")
+    }
+
+    // L5PY-->TC_HO:
+    if (isHO) {
+        createSyns(cellLists_HO.o(1), nodeGidLists_HO.o(1), "GLU", P_release_Th, amps, pc)
+        nc_L5PY_TC_HO = connect2pops(ratio_L5PY_TC, 4, koefWeiL5TC*$5, cellLists_L5.o(8), gidLists_L5.o(8), \
+                            cellLists_HO.o(1), gidLists_HO.o(1), synSpread_CxTh, P_release_ThCx, amps, edge, "GLU")
+        if (randomise.x[4]) {
+            weight = 0.04  // 0.04: ~0.2mV
+            ncTCminisAMPAout_HO2 = connectMinis(cellLists_HO.o(1), 0.6, weight, "AMPA")
+            nc_L5PY_TC_HO.append(ncTCminisAMPAout_HO2)
+        }
+    }
+}
+
+
+
+proc adjMinis() {
+    // L2/3:
+    if (isHO) {
+        converge_L23PY = converge_L23PY + gidLists_HO.o(1).size()*ratio_TC_L23PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L23.o(8), converge_L23PY)
+        if (connectIN) {
+            converge_L23IN = converge_L23IN + gidLists_HO.o(1).size()*ratio_TC_L23IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L23.o(9), converge_L23IN)
+        }
+    }
+
+    // L4:
+    if (isFO && !isHO) {
+        converge_L4PY = converge_L4PY + gidLists_FO.o(1).size()*ratio_TC_L4PY_FO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L4.o(8), converge_L4PY)
+        if (connectIN) {
+            converge_L4IN = converge_L4IN + gidLists_FO.o(1).size()*ratio_TC_L4IN_FO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L4.o(9), converge_L4IN)
+        }
+    } else if (isHO && !isFO) {
+        converge_L4PY = converge_L4PY + gidLists_HO.o(1).size()*ratio_TC_L4PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L4.o(8), converge_L4PY)
+        if (connectIN) {
+            converge_L4IN = converge_L4IN + gidLists_HO.o(1).size()*ratio_TC_L4IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L4.o(9), converge_L4IN)
+        }
+    } else if (isFO && isHO) {
+        converge_L4PY = converge_L4PY + gidLists_FO.o(1).size()*ratio_TC_L4PY_FO*synSpread_ThCx*P_release_ThCx + gidLists_HO.o(1).size()*ratio_TC_L4PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L4.o(8), converge_L4PY)
+        if (connectIN) {
+            converge_L4IN = converge_L4IN + gidLists_FO.o(1).size()*ratio_TC_L4IN_FO*synSpread_ThCx*P_release_ThCx + gidLists_HO.o(1).size()*ratio_TC_L4IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L4.o(9), converge_L4IN)
+        }
+    }
+
+    // L5:
+    if (isFO && !isHO) {
+        converge_L5PY = converge_L5PY + gidLists_FO.o(1).size()*ratio_TC_L5PY_FO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L5.o(8), converge_L5PY)
+        if (connectIN) {
+            converge_L5IN = converge_L5IN + gidLists_FO.o(1).size()*ratio_TC_L5IN_FO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L5.o(9), converge_L5IN)
+        }
+    } else if (isHO && !isFO) {
+        converge_L5PY = converge_L5PY + gidLists_HO.o(1).size()*ratio_TC_L5PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L5.o(8), converge_L5PY)
+        if (connectIN) {
+            converge_L5IN = converge_L5IN + gidLists_HO.o(1).size()*ratio_TC_L5IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L5.o(9), converge_L5IN)
+        }
+    } else if (isFO && isHO) {
+        converge_L5PY = converge_L5PY + gidLists_FO.o(1).size()*ratio_TC_L5PY_FO*synSpread_ThCx*P_release_ThCx + gidLists_HO.o(1).size()*ratio_TC_L5PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L5.o(8), converge_L5PY)
+        if (connectIN) {
+            converge_L5IN = converge_L5IN + gidLists_FO.o(1).size()*ratio_TC_L5IN_FO*synSpread_ThCx*P_release_ThCx + gidLists_HO.o(1).size()*ratio_TC_L5IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L5.o(9), converge_L5IN)
+        }
+    }
+
+    // L6:
+    if (isHO) {
+        converge_L6PY = converge_L6PY + gidLists_HO.o(1).size()*ratio_TC_L6PY_HO*synSpread_ThCx*P_release_ThCx
+        adjLayerMinis(cellLists_L6.o(8), converge_L6PY)
+        if (connectIN) {
+            converge_L6IN = converge_L6IN + gidLists_HO.o(1).size()*ratio_TC_L6IN_HO*synSpread_ThCx*P_release_ThCx
+            adjLayerMinis(cellLists_L6.o(9), converge_L6IN)
+        }
+    }
+
+    // TC:
+    if (isFO) {
+        converge_TC = gidLists_L6.o(8).size()*ratio_L6PY_TCFO*synSpread_CxTh*P_release_ThCx
+        adjLayerMinis(cellLists_FO.o(1), converge_TC)
+    }
+    if (isHO) {
+        converge_TC = gidLists_L6.o(8).size()*ratio_L6PY_TCHO*synSpread_CxTh*P_release_ThCx + gidLists_L5.o(8).size()*ratio_L5PY_TC*synSpread_CxTh*P_release_ThCx
+        adjLayerMinis(cellLists_HO.o(1), converge_TC)
+    }
+
+    // NRT:
+    converge_NRT = converge_NRT + gidLists_L6.o(8).size()*ratio_L6PY_NRT*synSpread_CxTh*P_release_ThCx
+    if (isFO) {
+        adjLayerMinis(cellLists_FO.o(4), converge_NRT)
+    }
+    if (isHO) {
+        adjLayerMinis(cellLists_HO.o(4), converge_NRT)
+    }
+}
+
+
+
+proc addMinis() {localobj minisE, synE, ncSynE, r
+    TCminisAMPAList = new List()
+    ncTCminisAMPAout_FO = new List()
+    for i = 0, cellLists_FO.o(1).count()-1 {
+        minisE = new minisI()
+        minisE.interval = 75*P_release_ThCx
+        minisE.noise = 1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(cellLists_FO.o(1).o(i).rcount, cellLists_FO.o(1).o(i).gid)}
+        cellLists_FO.o(1).o(i).rcount = cellLists_FO.o(1).o(i).rcount+1
+        r.negexp(1)
+        minisE.noiseFromRandom(r)
+        cellLists_FO.o(1).o(i).rlist.append(r)
+        TCminisAMPAList.append(minisE)
+        cellLists_FO.o(1).o(i).createSyn("AMPA", 1, 0)
+        synE = cellLists_FO.o(1).o(i).getSyn("AMPA")
+        ncSynE = new NetCon(minisE, synE)
+        ncSynE.delay = 0.6
+        ncSynE.weight = 0.04    // 0.04: ~0.2 mV @-65 mV and Ri = ~160 MOhms
+        ncTCminisAMPAout_FO.append(ncSynE)
+    }
+}
+
+
+
+if (isCx && (isFO || isHO)) {
+    connectStructs(1,1,1,1,1)
+    if (randomise.x[4]) {
+        adjMinis()
+    }
+} else if (isFO && randomise.x[4]) {
+    addMinis()
+}

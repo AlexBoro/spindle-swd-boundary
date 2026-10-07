@@ -1,0 +1,32 @@
+proc init() {
+    finitialize(v_init)
+    dt = Dt
+    if (initState == 2) {
+        t = -2e3
+        dt = 1
+        temp = cvode.active()                                               // if cvode is on, turn it off to do large fixed step
+        if (temp != 0) { cvode.active(0) }
+        while (t<-1) { fadvance() }
+        if (temp != 0) { cvode.active(1) }                                  // restore cvode if necessary
+        dt = Dt
+    } else {
+        if (initState == 3) {
+            while (t<3010.65) { fadvance() }
+            saveStates()
+            finitialize(v_init)
+            dt = Dt
+        } else {
+            if (initState == 4) {
+                loadStates()
+            }
+        }
+    }
+    t = 0
+
+    if (cvode.active()) {
+        cvode.re_init()
+    } else {
+        fcurrent()
+    }
+    frecord_init()
+}

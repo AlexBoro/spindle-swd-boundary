@@ -1,0 +1,49 @@
+// Perform cortex-related computing and simulation routines
+
+objref vClampList_L23
+objref vClampList_L4
+objref vClampList_L5
+objref vClampList_L6
+
+{ load_file("Cx.hoc") }
+vClampList_L23 = clampCells(cellLists_L23.o(0))
+vClampList_L4 = clampCells(cellLists_L4.o(0))
+vClampList_L5 = clampCells(cellLists_L5.o(0))
+vClampList_L6 = clampCells(cellLists_L6.o(0))
+
+
+
+/*  A procedure for running a simple cortical simulation. */
+    proc CxBasic() {localobj data_L23, data_L4, data_L5, data_L6
+        if (saveData) {
+            data_L23 = dataMultiParallel(cellLists_L23.o(0), vClampList_L23)
+            data_L4 = dataMultiParallel(cellLists_L4.o(0), vClampList_L4)
+            data_L5 = dataMultiParallel(cellLists_L5.o(0), vClampList_L5)
+            data_L6 = dataMultiParallel(cellLists_L6.o(0), vClampList_L6)
+        }
+        runMain()
+        if (saveData) {
+            saveMultiParallelCx(data_L23, cellLists_L23.o(0), nodeGidLists_L23.o(0), \
+                cellTypeInd_L23, gidLists_L23, gidLists_L23.o(0).min(), 2)
+            saveMultiParallelCx(data_L4, cellLists_L4.o(0), nodeGidLists_L4.o(0), \
+                cellTypeInd_L4, gidLists_L4, gidLists_L4.o(0).min(), 4)
+            saveMultiParallelCx(data_L5, cellLists_L5.o(0), nodeGidLists_L5.o(0), \
+                cellTypeInd_L5, gidLists_L5, gidLists_L5.o(0).min(), 5)
+            saveMultiParallelCx(data_L6, cellLists_L6.o(0), nodeGidLists_L6.o(0), \
+                cellTypeInd_L6, gidLists_L6, gidLists_L6.o(0).min(), 6)
+        }
+    }
+
+
+
+
+
+
+
+if (runMode == 0) {
+    /*gid = gidLists_L5.o(6).x[0]
+    if (pc.gid_exists(gid, pc.id)) {
+        stim = stimSingle(pc.gid2cell(gid), 0e3, 1e3, -1)
+    }*/
+    CxBasic()
+}

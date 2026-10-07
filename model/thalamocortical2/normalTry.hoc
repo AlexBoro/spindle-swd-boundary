@@ -1,0 +1,19 @@
+objref r, g, hist, vec
+r = new Random()
+mu = 1 //0.00003225
+sd = .001 //0.000001
+{r.normal(mu, sd)}
+
+vec = new Vector(5000)
+for(i=0; i<4999; i=i+1){
+	vec.x[i] = r.repick()
+}
+
+objref savData, dataMatrix
+savData = new File()
+{savData.wopen("HAHAHA.dat")}
+dataMatrix = new Matrix()
+{dataMatrix.resize(1, vec.size())}
+{dataMatrix.setrow(0, vec)}
+{dataMatrix.fprint(savData, "%g\t")}
+{savData.close()}

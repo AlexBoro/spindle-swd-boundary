@@ -1,0 +1,306 @@
+// Perform Cx cell related computing and simulation routines
+
+objref cell, stim, stimMinisE, stimMinisI, synE, synI, ncSynE, ncSynI, syn, ncSyn
+cell = new Cx3cell(modelType, 0)
+access cell.dend
+print ri(0.5)
+
+
+
+/*  A procedure for rescaling the error tolerances of states when using cvode. */
+    proc rescaleET() {local precision
+        if (varDt || varDt_local) {
+            //precision = 1e-3
+            precision = 1e-7
+            cvode.atolscale("v",            max(precision, 10))
+            cvode.atolscale("nai",          max(precision, 10))
+            cvode.atolscale("cai",          max(precision, 1e-5))
+            if (modelType == 13) {
+            cvode.atolscale("m1_iahp",      max(precision, 1e-5))
+            cvode.atolscale("m2_iahp",      max(precision, 1e-7))
+            }
+            cvode.atolscale("m_ihvaCx",     max(precision, 0.0001))
+            cvode.atolscale("h_ihvaCx",     max(precision, 0.1))
+            cvode.atolscale("n_ikca",       max(precision, 0.01))
+            cvode.atolscale("a_ikf",        max(precision, 0.1))
+            cvode.atolscale("b_ikf",        max(precision, 0.1))
+            cvode.atolscale("n_im",         max(precision, 0.01))
+            cvode.atolscale("m_inapCx2",    max(precision, 0.01))
+            cvode.atolscale("m_itGHK",      max(precision, 0.1))
+            cvode.atolscale("h_itGHK",      max(precision, 0.01))
+            cvode.atolscale("p0_iarCx3CaD", max(precision, 1))
+            cvode.atolscale("p1_iarCx3CaD", max(precision, 1e-6))
+            cvode.atolscale("c_iarCx3CaD",  max(precision, 1))
+            cvode.atolscale("o1_iarCx3CaD", max(precision, 0.001))
+            cvode.atolscale("o2_iarCx3CaD", max(precision, 1e-7))
+            cvode.atolscale("m_hhCx",       max(precision, 0.01))
+            cvode.atolscale("h_hhCx",       max(precision, 0.1))
+            cvode.atolscale("n_hhCx",       max(precision, 0.0001))
+            if (randomise.x[4]) {
+            cvode.atolscale("AMPA_S.Ron",   max(precision, 0.01))
+            cvode.atolscale("AMPA_S.Roff",  max(precision, 0.01))
+            cvode.atolscale("GABAa_S.Ron",  max(precision, 0.001))
+            cvode.atolscale("GABAa_S.Roff", max(precision, 0.001))
+            }
+        }
+    }
+
+
+
+/*  A procedure for setting up minis. */
+    proc miniStim() {local smooth
+        smooth = 1                              // increase to smooth the appearance of the voltage trace
+        stimMinisE = new minisI()
+        stimMinisE.interval = (1/smooth)*75
+        stimMinisE.noise = 1
+        cell.createSyn("AMPA", 1, 0)
+        synE = cell.getSyn("AMPA")
+        ncSynE = new NetCon(stimMinisE, synE)
+        ncSynE.delay = 0
+        ncSynE.weight = (1/smooth)*0.18         // 0.22: ~0.15 mV @-65 mV in an otherwise hyperpolarised RS
+                                                // 0.18: ~0.15 mV @-65 mV in an otherwise hyperpolarised FS
+        stimMinisI = new minisI()
+        stimMinisI.interval = (1/smooth)*150
+        stimMinisI.noise = 1
+        cell.createSyn("GABAa", 1, 0)
+        synI = cell.getSyn("GABAa")
+        ncSynI = new NetCon(stimMinisI, synI)
+        ncSynI.delay = 0
+        ncSynI.weight = (1/smooth)*0.12         // 0.14: ~-0.15 mV @-65 mV in an otherwise hyperpolarised RS
+                                                // 0.12: ~-0.15 mV @-65 mV in an otherwise hyperpolarised FS
+    }
+
+
+
+/*  A procedure for constructing a name containing key parameter values.
+    Inputs:
+    $1 - amplitude of injected current (nA);
+    $2 - axial resistivity of the dendritic compartment (Ohm-cm);
+    $3 - input resistance of the dendritic compartment (MOhm).*/
+    proc nameLong() {local amp, Raxial, kappa
+        amp = $1
+        Raxial = $2
+        kappa = $3
+        if (Raxial < 1e1) {
+        	sprint(dataFile, "Cx3data%1.7f_0000%1.0f_%2.6f.dat", amp, Raxial, kappa)
+        } else if (Raxial < 1e2) {
+        	sprint(dataFile, "Cx3data%1.7f_000%2.0f_%2.6f.dat", amp, Raxial, kappa)
+        } else if (Raxial < 1e3) {
+        	sprint(dataFile, "Cx3data%1.7f_00%3.0f_%2.6f.dat", amp, Raxial, kappa)
+        } else if (Raxial < 1e4) {
+        	sprint(dataFile, "Cx3data%1.7f_0%4.0f_%2.6f.dat", amp, Raxial, kappa)
+        } else {
+        	sprint(dataFile, "Cx3data%1.7f_%5.0f_%2.6f.dat", amp, Raxial, kappa)
+        }
+    }
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the axial resistance
+    between the dend and soma compartments. */
+    proc testKappa() {local amp, i, kappa  localobj data, clamp
+        amp = 0 //0.1
+        stim = stimSingle(cell, 1e3, 8e3, amp, "soma")
+        if (saveData) {
+            data = new Cx3data(cell, clamp, saveData)
+        }
+        for (i = 25; i <= 100; i += 01) {
+            cell.soma.Ra = i
+            cell.dend.Ra = i
+            access cell.dend
+            kappa = ri(0.5)
+            runMain()
+            if (saveData) {
+            	strdef dataFile
+                nameLong(amp, i, kappa)
+                data.save(dataFile, saveData)
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the current injected
+    into the axosomatic compartment. */
+    proc testDC() {local amp, Raxial, kappa  localobj data, stim, stim2, clamp
+        stim = stimSingle(cell, 3e3, 20e3, 0, "soma")
+        //stim2 = stimSingle(cell, 0e3, 3e3, -0.125, "soma")
+        for (amp = 0.000; amp <= 0.150; amp += 0.001) {
+        //for (amp = 0.150; amp <= 0.200; amp += 0.001) {
+            stimSingleAdj(stim, 3e3, 20e3, amp)
+            if (saveData) {
+                data = new Cx3data(cell, clamp, saveData)
+            }
+            Raxial = cell.dend.Ra
+            access cell.dend
+            kappa = ri(0.5)
+            runMain()
+            if (saveData) {
+            	strdef dataFile
+                nameLong(amp, Raxial, kappa)
+                if (varDt && !varDt_local) {
+                    sprint(dataFile, "x%g_%s", saveData, dataFile)
+                } else if (varDt && varDt_local) {
+                    sprint(dataFile, "y%g_%s", saveData, dataFile)
+                } else {
+                    sprint(dataFile, "z%g_%s", saveData, dataFile)
+                }
+                data.save(dataFile, saveData)
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the input resistance. */
+    proc testRi() {local i  localobj data, stim, clamp
+        //stim = stimSingle(cell, 1e3, 3e3, 0, "soma")
+        //for (i = 0.000001; i <= 0.000020; i += 0.000001) {
+        for (i = 0.000001; i <= 0.000080; i += 0.000001) {
+            cell.soma.g_pas = i
+            cell.dend.g_pas = i
+            if (saveData) {
+                data = new Cx3data(cell, clamp, saveData)
+            }
+            Raxial = cell.dend.Ra
+            access cell.dend
+            kappa = ri(0.5)
+            runMain()
+            if (saveData) {
+            	strdef dataFile
+                nameLong(i, Raxial, kappa)
+                sprint(dataFile, "y%g_%s", saveData, dataFile)
+                data.save(dataFile, saveData)
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the K+ leak current. */
+    proc testIKleak() {local i  localobj data, stim, clamp
+        stim = stimSingle(cell, 1e3, 3e3, 0, "soma")
+        for (i = 0.00000001; i <= 0.00001; i += 0.0000001) {
+            cell.soma.g_kleak = i
+            cell.dend.g_kleak = i
+            if (saveData) {
+                data = new Cx3data(cell, clamp, saveData)
+            }
+            runMain()
+            if (saveData) {
+            	strdef dataFile
+                sprint(dataFile, "Cx3data%1.8f.dat", i)
+                data.save(dataFile, saveData)
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the I_h density. */
+    proc testIh() {local i  localobj data, stim, clamp
+        stim = stimSingle(cell, 0e3, 0e3, 0, "soma")
+        for (i = 0.0000001; i <= 0.0000010; i += 0.0000001) {
+            print i
+            cell.dend.ghbar_iarCx3 = i
+            for (j = 0.000005; j <= 0.000011; j += 0.0000001) {
+                cell.soma.g_kleak = j
+                cell.dend.g_kleak = j
+                if (saveData) {
+                    data = new Cx3data(cell, clamp, saveData)
+                }
+                runMain()
+                if (saveData) {
+                    strdef dataFile
+                    sprint(dataFile, "Cx3data%1.7f_%1.7f.dat", i, j)
+                    data.save(dataFile, saveData)
+                }
+            }
+        }
+    }
+
+    proc testIhginc_EF() {local cl, amp, Raxial, kappa  localobj data, stim, clamp
+        stim = stimFamily(cell, 0e3, 0e3,   0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,    0,   0.1,     0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+        cl = 1000/3.5
+        up = 350 //cl/2-50
+        down = 1000 //cl/2+50
+        for (amp = 0.000; amp <= 0.200; amp += 0.010) {
+            amp2 = amp-amp
+            // 3s + 14 cycles + 1s
+            stimFamilyAdj(stim, 3e3, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, 1e3,   0, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, 0)
+            if (saveData) {
+                data = new Cx3data(cell, clamp, saveData)
+            }
+            Raxial = cell.dend.Ra
+            access cell.dend
+            kappa = ri(0.5)
+            runMain()
+            if (saveData) {
+            	strdef dataFile
+                nameLong(amp, Raxial, kappa)
+                sprint(dataFile, "z%g_%s", saveData, dataFile)
+                data.save(dataFile, saveData)
+            }
+        }
+    }
+
+
+
+if (randomise.x[4]) {
+    stim = stimFamily(cell, tstop, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   0.0354, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    miniStim()
+}
+
+rescaleET()
+
+if (runMode == 0) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    singleRun(cell, saveData)
+} else if (runMode == 1) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    //              order  start  limit  step  base  hold   dur1  dur2  dur3
+    vClampLoop(cell,    3,  -100,    40,    5,  -50, -100,   1e3,  1e3,  1e3, saveData)
+    // test I_T: vClampLoop(cell,    3,  -100,    40,    5,  -50, -100,   1e3,  1e3,  1e3, saveData)
+    // test I_h: vClampLoop(cell,    2,  -110,   -40,    5,  -65,  -65,   5e3,  5e3,  5e3, saveData)
+} else if (runMode == 2) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    addGraph("cell.dend.v(0.5)", 2000, 120, 1500, 850)
+    //                     dur1 dur2 dur3                                                         amp1   amp2   amp3
+    stim = stimFamily(cell, 3e3, 1e3,   0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,    0,   0.1,     0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRun(cell, saveData)
+} else if (runMode == 3) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    amp2 = 0 //0.07555 //0.0099005 //0.0762 //0.0784 //0 //0.083 //0.08055
+    iStep = -0.02
+    amp3 = amp2 + iStep
+    dur = 5e3
+    dur2 = 15e3
+    //                     dur1 dur2 dur3                                                        amp1  amp2  amp3
+    stim = stimFamily(cell, dur,dur2, dur, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   0, amp2, amp3, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRunRi(cell, iStep, dur, dur2, saveData)
+    amp = 0
+    amp2 = 0.01
+    amp3 = -0.01
+    dur = 5e3
+    dur2 = 1e3
+    dur3 = dur - dur2
+    //                 dur1  dur2  dur3  dur4, dur5                                                   amp1  amp2 amp3  amp4 amp5
+    stimFamilyAdj(stim, dur, dur2, dur3, dur2, dur3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, amp, amp2, amp, amp3, amp,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRunTau(cell, dur, dur2, saveData)
+} else if (runMode == 4) {
+    atoltool()
+} else if (runMode == 6) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    addGraph("cell.dend.v(0.5)", 2000, 120, 1500, 850)
+    //testKappa()
+    testDC()
+    //testRi()
+    //testIKleak()
+    //testIh()
+    //testIhginc_EF()
+}

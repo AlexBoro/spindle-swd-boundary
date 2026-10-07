@@ -1,0 +1,74 @@
+// Perform Cx cell related computing and simulation routines
+
+objref cell, stim
+cell = new Cx2cell()
+access cell.dend
+print ri(0.5)
+
+
+if (varDt) {
+    cvode.atolscale("cai", 0.001)
+}
+
+
+
+/*  A procedure for exploring the variability of the membrane response
+    properties of a cortical cell due to the change in the axial resistance
+    between the dend and soma compartments. */
+    proc testKappa() {local amp, i, kappa  localobj data, clamp
+        amp = 0.1
+        stim = stimSingle(cell, 1e3, 3e3, amp)
+        if (saveData) {
+    
+            data = new Cx2data(cell, clamp)
+        }
+        for (i = 1; i <= 500; i += 5) {
+            cell.soma.Ra = i
+            cell.dend.Ra = i
+            access cell.dend
+            kappa = ri(0.5)
+            run()
+            if (saveData) {
+            	strdef dataFile
+                if (i < 1e1) {
+                    sprint(dataFile, "Cx2data%1.3f_0000%1.0f_%2.6f.dat", amp, i, kappa)
+                } else if (i < 1e2) {
+                    sprint(dataFile, "Cx2data%1.3f_000%2.0f_%2.6f.dat", amp, i, kappa)
+                } else if (i < 1e3) {
+                    sprint(dataFile, "Cx2data%1.3f_00%3.0f_%2.6f.dat", amp, i, kappa)
+                } else if (i < 1e4) {
+                    sprint(dataFile, "Cx2data%1.3f_0%4.0f_%2.6f.dat", amp, i, kappa)
+                } else {
+                    sprint(dataFile, "Cx2data%1.3f_%5.0f_%2.6f.dat", amp, i, kappa)
+                }
+                data.save(dataFile)
+            }
+        }
+    }
+
+
+
+if (runMode == 0) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    singleRun(cell, saveData)
+} else if (runMode == 2) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    addGraph("cell.dend.v(0.5)", 2000, 120, 1500, 850)
+    //                     dur1 dur2 dur3                                                         amp1   amp2   amp3
+    stim = stimFamily(cell, 1e3, 1e3,   0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,    0,   0.1,     0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRun(cell, saveData)
+} else if (runMode == 3) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    amp2 = 0.0213
+    iStep = -0.02
+    amp3 = amp2 + iStep
+    dur = 5e3
+    dur2 = 15e3
+    //                     dur1 dur2 dur3                                                        amp1  amp2  amp3
+    stim = stimFamily(cell, dur,dur2, dur, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   0, amp2, amp3, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRunRi(cell, iStep, dur, dur2, saveData)
+} else if (runMode == 6) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    addGraph("cell.dend.v(0.5)", 2000, 120, 1500, 850)
+    testKappa()
+}

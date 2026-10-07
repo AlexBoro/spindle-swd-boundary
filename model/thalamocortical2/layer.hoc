@@ -1,0 +1,818 @@
+/*----------------------------------------------------------------------------
+
+    Routines for building the neocortical layer models
+	==================================================
+
+    Call createLayer() to build a cortical layer. The input is
+    $s1 - the string representing the layer type: L2/3 - "L23", L4 - "L4",
+          L5 - "L5", pathological L5 - "pL5", L6 - "L6".
+
+    Layer inputs are stored in the input_L* object. input_L* is a list with
+    the following structure:
+        input_L* /list of n of cells lists/ ->
+            -> cell list /list with synList and minisList/ ->
+                -> synList /list of n synapse objects/
+                -> minisList /list of n minis objects/
+    The minis objects are connected to the corresponding order synpase
+    objects.
+
+    Layer outputs are stored in the output_L* object. output_L* is a list   
+    of pointers to cell.soma.v(0.5). The number of pointers is the same as
+    the number of cells in the layer network.
+
+    The excitatory input fanout factor onto excitatory cells is stored in
+    the scalar ratioPYPY_L*
+
+    The excitatory input ratio factor onto interneurons is stored in the
+    scalar ratioPYIN_L*
+
+    For accessing local (located on a node) cell lists use cellLists_L*
+    object. cellLists_L* is a list of different cell type lists. Its
+    structure is as follows:
+        cellLists_L* /cell lists/ ->
+            -> cells    /list of all cells on a node/
+            -> RScells  /list of RS cells on a node/
+            -> EFcells  /list of EF cells on a node/
+            -> IBcells  /list of IB cells on a node/
+            -> RIBcells /list of RIB cells on a node/
+            -> SIBcells /list of SIB cells on a node/
+            -> NDcells  /list of ND cells on a node/
+            -> LTScells /list of LTS cells on a node/
+            -> PYcells  /list of PY cells on a node/
+            -> FScells  /list of FS cells on a node/
+
+    To access local gid lists use nodeGidLists_L* object. nodeGidsLists_L*
+    is a list of different types of local gid lists corresponding to
+    different cell type lists in cellLists_L*. It has the following
+    structure:
+        nodeGidLists_L* /local gid lists/ ->
+            -> nodeGids
+            -> nodeRSgids
+            -> nodeEFgids
+            -> nodeIBgids
+            -> nodeRIBgids
+            -> nodeSIBgids
+            -> nodeNDgids
+            -> nodeLTSgids
+            -> nodePYgids
+            -> nodeFSgids
+
+    Global (across all nodes) gids of the layer are located in gidLists_L*
+    object. Its structure is as follows:
+        gidLists_L* /global gid lists/ ->
+            -> gids
+            -> RSgids
+            -> EFgids
+            -> IBgids
+            -> RIBgids
+            -> SIBgids
+            -> NDgids
+            -> LTSgids
+            -> PYgids
+            -> FSgids
+
+    The cell type indices list is cellTypeInd_L*. If cell positions in the
+    layer network are randomised, then the quickest way to figure out the
+    type of the cell represented by a particular gid number is to call
+    cellTypeInd_L*.x[gid]. Otherwise, look for a match in the gidLists_L*.
+
+    The netcons are stored in ncPYPY_L*, ncPYIN_L*, and ncINPY_L* lists. If
+    the synapses are combined, then the structure of these lists is
+        ncPYPY_L* /PY-to-PY lists/ ->
+            -> syns AMPA+NMDA, no minis netcon list
+            -> minis in netcon list
+            -> minis out netcon list
+        ncPYIN_L* /PY-to-IN lists/ ->
+            -> syns AMPA+NMDA, no minis netcon list
+            -> minis in netcon list
+            -> minis out netcon list
+        ncINPY_L* /IN-to-PY lists/ ->
+            -> syns GABAa+GABAb, no minis netcon list
+            -> minis in netcon list
+            -> minis out netcon list.
+    Otherwise if not combined, then it is as follows:
+        ncPYPY_L* /PY-to-PY lists/ ->
+            -> ncPYPYAMPA /PY-to-PY AMPA lists/ ->
+                -> syns AMPA, no minis netcon list
+                -> minis AMPA in netcon list
+                -> minis AMPA out netcon list
+            -> syns NMDA, no minis netcon list
+        ncPYIN_L* /PY-to-IN lists/ ->
+            -> ncPYINAMPA /PY-to-IN AMPA lists/ ->
+                -> syns AMPA, no minis netcon list
+                -> minis AMPA in netcon list
+                -> minis AMPA out netcon list
+            -> syns NMDA, no minis netcon list
+        ncINPY_L* /IN-to-PY lists/ ->
+            -> ncINPYGABAa /IN-to-PY GABAa lists/ ->
+                -> syns GABAa, no minis netcon list
+                -> minis GABAa in netcon list
+                -> minis GABAa out netcon list
+            -> syns GABAb, no minis netcon list.
+
+    Release probabilities and synaptic spread factors are stored in
+    P_release_L and synSpread_L, respectively.
+
+    Written by Martynas Dervinis, Cardiff University, 2014.
+
+----------------------------------------------------------------------------*/
+
+
+
+objref cellTypeInd, devRi, cells, RScells, EFcells, IBcells, RIBcells, SIBcells, NDcells, LTScells, PYcells, FScells, cellLists
+objref nodeGids, nodeRSgids, nodeEFgids, nodeIBgids, nodeRIBgids, nodeSIBgids, nodeNDgids, nodeLTSgids, nodePYgids, nodeFSgids, nodeGidLists
+objref gids, RSgids, EFgids, IBgids, RIBgids, SIBgids, NDgids, LTSgids, PYgids, FSgids, gidLists
+objref ncPYPYAMPA, ncPYPYNMDA, ncPYINAMPA, ncPYINNMDA, ncINPYGABAa, ncINPYGABAb
+objref delPYPY, delPYIN, delINPY, weiPYPYAMPA, weiPYPYNMDA, weiPYINAMPA, weiPYINNMDA, weiINPYGABAa, weiINPYGABAb
+objref ncPYPY, ncPYIN, ncINPY, weiPYPY, weiPYIN, weiINPY, ampPYPY, ampPYIN, ampINPY
+objref ncPYminisAMPAout, ncPYminisGABAaout, ncINminisAMPAout
+objref ncSpike, tvec, idvec, nil
+objref input_L23, output_L23, cellLists_L23, nodeGidLists_L23, gidLists_L23, cellTypeInd_L23, ncPYPY_L23, ncPYIN_L23, ncINPY_L23
+objref input_L4, output_L4, cellLists_L4, nodeGidLists_L4, gidLists_L4, cellTypeInd_L4, ncPYPY_L4, ncPYIN_L4, ncINPY_L4
+objref input_L5, output_L5, cellLists_L5, nodeGidLists_L5, gidLists_L5, cellTypeInd_L5, ncPYPY_L5, ncPYIN_L5, ncINPY_L5
+objref input_L6, output_L6, cellLists_L6, nodeGidLists_L6, gidLists_L6, cellTypeInd_L6, ncPYPY_L6, ncPYIN_L6, ncINPY_L6
+if (!(name_declared("gid"))) {
+    gid = 0
+}
+
+proc initParam() {local koefWei     // $s1 - layer type
+    strdef layerType
+    layerType = $s1
+    koefWeiEE = 1.75
+    koefWeiEI = 1.75
+    koefWeiIE = 4
+    PYPYamp = 0
+    PYINamp = 0
+    INPYamp = 0
+    smooth = 1
+    if (!strcmp(layerType, "L23")) {
+        nPYgids = 100
+        nFSgids = 50
+        ratioPYPY = 0.10
+        ratioPYIN = 0.10
+        ratioINPY = 0.10
+        PYPYfact = koefWeiEE*0.7      // 0.5mV
+        PYINfact = koefWeiEI*0.7
+        INPYfact = koefWeiIE*0.5
+        delayPYPY = 3                   // must be >0.6
+        delayPYIN = 1.5                 // must be >0.6
+        delayINPY = 1.5                 // must be >0.6
+    } else if (!strcmp(layerType, "L4")) {
+        nPYgids = 100
+        nFSgids = 50
+        ratioPYPY = 0.10
+        ratioPYIN = 0.10
+        ratioINPY = 0.10
+        PYPYfact = koefWeiEE*0.7
+        PYINfact = koefWeiEI*0.7
+        INPYfact = koefWeiIE*0.5
+        delayPYPY = 3
+        delayPYIN = 1.5
+        delayINPY = 1.5
+    } else if (!strcmp(layerType, "L5") || !strcmp(layerType, "pL5")) {
+        nPYgids = 100
+        nFSgids = 50
+        ratioPYPY = 0.10
+        ratioPYIN = 0.10
+        ratioINPY = 0.10
+        PYPYfact = koefWeiEE*0.7
+        PYINfact = koefWeiEI*0.7
+        INPYfact = koefWeiIE*0.5
+        delayPYPY = 3
+        delayPYIN = 1.5
+        delayINPY = 1.5
+    } else if (!strcmp(layerType, "L6") || !strcmp(layerType, "pL6")) {
+        nPYgids = 100
+        nFSgids = 50
+        ratioPYPY = 0.10
+        ratioPYIN = 0.10
+        ratioINPY = 0.10
+        PYPYfact = koefWeiEE*0.7
+        PYINfact = koefWeiEI*0.7
+        INPYfact = koefWeiIE*0.5
+        delayPYPY = 3
+        delayPYIN = 1.5
+        delayINPY = 1.5
+    }
+    ngids = nPYgids + nFSgids
+    P_release_L = 1 // Synaptic release probability
+    synSpread_L = 1 // Number of synapses formed between any two connecting neurons
+}
+
+
+
+
+
+// ------------------------------------------------------------------------
+// Create models of single cells:
+// ------------------------------------------------------------------------
+
+proc initCells() {
+    cells = new List()
+    RScells = new List()
+    EFcells = new List()
+    IBcells = new List()
+    RIBcells = new List()
+    SIBcells = new List()
+    NDcells = new List()
+    LTScells = new List()
+    PYcells = new List()
+    FScells = new List()
+    cellLists = new List()
+    cellLists.append(cells)
+    cellLists.append(RScells)
+    cellLists.append(EFcells)
+    cellLists.append(IBcells)
+    cellLists.append(RIBcells)
+    cellLists.append(SIBcells)
+    cellLists.append(NDcells)
+    cellLists.append(LTScells)
+    cellLists.append(PYcells)
+    cellLists.append(FScells)
+    nodeGids = new Vector()
+    nodeRSgids = new Vector()
+    nodeEFgids = new Vector()
+    nodeIBgids = new Vector()
+    nodeRIBgids = new Vector()
+    nodeSIBgids = new Vector()
+    nodeNDgids = new Vector()
+    nodeLTSgids = new Vector()
+    nodePYgids = new Vector()
+    nodeFSgids = new Vector()
+    nodeGidLists = new List()
+    nodeGidLists.append(nodeGids)
+    nodeGidLists.append(nodeRSgids)
+    nodeGidLists.append(nodeEFgids)
+    nodeGidLists.append(nodeIBgids)
+    nodeGidLists.append(nodeRIBgids)
+    nodeGidLists.append(nodeSIBgids)
+    nodeGidLists.append(nodeNDgids)
+    nodeGidLists.append(nodeLTSgids)
+    nodeGidLists.append(nodePYgids)
+    nodeGidLists.append(nodeFSgids)
+    gids = new Vector(ngids)
+    if (!strcmp(layerType, "L23")) {
+        RSgids = new Vector(75/100*nPYgids)     // 75/100
+        EFgids = new Vector(5/100*nPYgids)      // 5/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector()
+    } else if (!strcmp(layerType, "L4")) {
+        RSgids = new Vector(80/100*nPYgids)     // 80/100
+        EFgids = new Vector()
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector()
+    } else if (!strcmp(layerType, "L5")) {
+        RSgids = new Vector(30/100*nPYgids)     // 30/100
+        EFgids = new Vector(20/100*nPYgids)     // 20/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector(15/100*nPYgids)    // 15/100
+        SIBgids = new Vector()
+        NDgids = new Vector(15/100*nPYgids)     // 15/100
+        LTSgids = new Vector()
+    } else if (!strcmp(layerType, "pL5")) {
+        RSgids = new Vector(30/100*nPYgids)     // 30/100
+        EFgids = new Vector(20/100*nPYgids)     // 20/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector(15/100*nPYgids)    // 15/100
+        NDgids = new Vector(15/100*nPYgids)     // 15/100
+        LTSgids = new Vector()
+    } else if (!strcmp(layerType, "L6")) {
+        RSgids = new Vector(75/100*nPYgids)     // 75/100
+        EFgids = new Vector(5/100*nPYgids)      // 5/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector()
+    } else if (!strcmp(layerType, "pL6")) {
+        RSgids = new Vector(75/100*nPYgids)     // 75/100
+        EFgids = new Vector(5/100*nPYgids)      // 5/100
+        IBgids = new Vector(5/100*nPYgids)      // 5/100
+        RIBgids = new Vector()
+        SIBgids = new Vector(15/100*nPYgids)    // 15/100
+        NDgids = new Vector()
+        LTSgids = new Vector()
+    }
+/*
+    if (!strcmp(layerType, "L23")) {
+        RSgids = new Vector(60/100*nPYgids)     // 60/100
+        EFgids = new Vector(10/100*nPYgids)     // 10/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector(10/100*nPYgids)    // 10/100
+    } else if (!strcmp(layerType, "L4")) {
+        RSgids = new Vector(70/100*nPYgids)     // 70/100
+        EFgids = new Vector()
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector(10/100*nPYgids)    // 10/100
+    } else if (!strcmp(layerType, "L5")) {
+        RSgids = new Vector(25/100*nPYgids)     // 25/100
+        EFgids = new Vector(20/100*nPYgids)     // 20/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector(15/100*nPYgids)    // 15/100
+        SIBgids = new Vector()
+        NDgids = new Vector(10/100*nPYgids)     // 10/100
+        LTSgids = new Vector(10/100*nPYgids)    // 10/100
+    } else if (!strcmp(layerType, "pL5")) {
+        RSgids = new Vector(25/100*nPYgids)     // 25/100
+        EFgids = new Vector(20/100*nPYgids)     // 20/100
+        IBgids = new Vector(20/100*nPYgids)     // 20/100
+        RIBgids = new Vector()
+        SIBgids = new Vector(15/100*nPYgids)    // 15/100
+        NDgids = new Vector(10/100*nPYgids)     // 10/100
+        LTSgids = new Vector(10/100*nPYgids)    // 10/100
+    } else if (!strcmp(layerType, "L6")) {
+        RSgids = new Vector(80/100*nPYgids)     // 80/100
+        EFgids = new Vector(10/100*nPYgids)     // 10/100
+        IBgids = new Vector()
+        RIBgids = new Vector()
+        SIBgids = new Vector()
+        NDgids = new Vector()
+        LTSgids = new Vector(10/100*nPYgids)    // 10/100
+    }
+*/
+    PYgids = new Vector(nPYgids)
+    FSgids = new Vector(nFSgids)
+    gidLists = new List()
+    gidLists.append(gids)
+    gidLists.append(RSgids)
+    gidLists.append(EFgids)
+    gidLists.append(IBgids)
+    gidLists.append(RIBgids)
+    gidLists.append(SIBgids)
+    gidLists.append(NDgids)
+    gidLists.append(LTSgids)
+    gidLists.append(PYgids)
+    gidLists.append(FSgids)
+    startGid = gid
+}
+
+
+
+proc positionCells() {
+    if (pc.id == 0) {
+        if (randomise.x[0]) {
+            cellTypeInd = randExhaust(r, 0, PYgids.size()-1)
+            randomInstance += 1
+            for i = cellTypeInd.size(), ngids-1 {
+                cellTypeInd.append(i)
+            }
+        } else {
+            cellTypeInd = vecIncrement(0,1,ngids-1)
+        }
+    } else {
+        cellTypeInd = new Vector()
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(cellTypeInd, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc riCells() {
+    devRi = new Vector(ngids)
+    if (pc.id == 0) {
+        if (randomise.x[1]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0, ngids-1 {
+                devRi.x[i] = normRepick(r)
+            }
+            randomInstance += 1
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(devRi, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc setRi() {  // $o1 - cell object; $2 - SD of Ri
+    if (randomise.x[1] == 1) {
+        x = normRepick(r)
+        $o1.soma.g_pas(0.5) = $o1.soma.g_pas(0.5) + $2*devRi.x[cellTypeInd.x[gid-startGid]]
+        $o1.dend.g_pas(0.5) = $o1.dend.g_pas(0.5) + $2*devRi.x[cellTypeInd.x[gid-startGid]]
+    }
+}
+
+
+
+proc createMini() { // $o1 - a cell; $2 - number of AMPA synapses per cell; $3 - number of GABAAsynapses per cell.
+    if (randomise.x[4]) {
+        $o1.createMini("AMPA", (1/smooth)*$2)
+        $o1.createMini("GABAa", (1/smooth)*$3)
+    }
+}
+
+
+
+obfunc pickCell() {localobj cell
+    if (cellTypeInd.x[gid-startGid] <= RSgids.size()-1) {
+        cell = new Cx3cell(9, gid) // RS
+        setRi(cell, 0.0000001)
+        RScells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeRSgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()-1) {
+        cell = new Cx3cell(10, gid) // EF
+        setRi(cell, 0.0000000001)
+        EFcells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeEFgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()-1) {
+        cell = new Cx3cell(11, gid) // IB
+        setRi(cell, 0.0000001)
+        IBcells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeIBgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()-1) {
+        cell = new Cx3cell(12, gid) // RIB
+        setRi(cell, 0.0000001)
+        RIBcells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeRIBgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()-1) {
+        cell = new Cx3cell(15, gid) // SIB
+        setRi(cell, 0.00000001)
+        SIBcells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeSIBgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()+NDgids.size()-1) {
+        cell = new Cx3cell(13, gid) // ND
+        setRi(cell, 0.0000000001)
+        NDcells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeNDgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()+NDgids.size()+LTSgids.size()-1) {
+        cell = new Cx3cell(16, gid) // LTS
+        setRi(cell, 0.0000000001)
+        LTScells.append(cell)
+        PYcells.append(cell)
+        createMini(cell, (nPYgids*ratioPYPY-1)*synSpread_L*P_release_L, nFSgids*ratioINPY*synSpread_L*P_release_L)
+        nodeNDgids.append(gid)
+        nodePYgids.append(gid)
+    } else if (cellTypeInd.x[gid-startGid] <= ngids-1) {
+        cell = new Cx3cell(14, gid) // FS
+        setRi(cell, 0.0000001)
+        FScells.append(cell)
+        if (randomise.x[4]) {
+            cell.createMini("AMPA", nPYgids*ratioPYIN*synSpread_L*P_release_L)
+        }
+        nodeFSgids.append(gid)
+    }
+    return cell
+}
+
+
+
+proc instantiateCells() {local i, j, k, l, m, n, o, x  localobj cell, nc
+    tvec = new Vector()         // will be Vectors that record all spike times (tvec)
+    idvec = new Vector()        // and the corresponding id numbers of the cells that spiked (idvec)
+    ncSpike = new List()
+    if (pProc) {
+        for cellitr(&gid, pc) {
+            pc.set_gid2node(gid, pc.id)
+            cell = pickCell()
+            nc = cell.connect2target(nil, 1, 1)
+            pc.cell(gid, nc)
+            //pc.spike_record(gid, tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+        }
+    } else {
+        for gid = startGid, startGid+ngids-1 {
+            cell = pickCell()
+            nc = cell.connect2target(nil, 1, 1)
+            //nc.record(tvec, idvec)
+            ncSpike.append(nc)
+            cells.append(cell)
+            nodeGids.append(gid)
+        }
+    }
+
+    i = 0
+    j = 0
+    k = 0
+    l = 0
+    m = 0
+    n = 0
+    o = 0
+    p = 0
+    for gid = startGid, startGid+ngids-1 {
+        if (cellTypeInd.x[gid-startGid] <= RSgids.size()-1) {
+            RSgids.x[i] = gid
+            i += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()-1) {
+            EFgids.x[j] = gid
+            j += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()-1) {
+            IBgids.x[k] = gid
+            k += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()-1) {
+        	RIBgids.x[l] = gid
+            l += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()-1) {
+        	SIBgids.x[l] = gid
+            l += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()+NDgids.size()-1) {
+        	NDgids.x[m] = gid
+            m += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= RSgids.size()+EFgids.size()+IBgids.size()+RIBgids.size()+SIBgids.size()+NDgids.size()+LTSgids.size()-1) {
+        	LTSgids.x[o] = gid
+            o += 1
+            PYgids.x[n] = gid
+            n += 1
+        } else if (cellTypeInd.x[gid-startGid] <= ngids-1) {
+        	FSgids.x[p] = gid
+            p += 1
+        }
+        gids.x[gid-startGid] = gid
+    }
+}
+
+
+
+proc createCells() {
+    initCells()
+    positionCells()
+    riCells()
+    instantiateCells()
+}
+
+
+
+
+
+// ------------------------------------------------------------------------
+// Create the network:
+// ------------------------------------------------------------------------
+
+proc delNet() {local i, x     // Set the synaptic delays
+    delPYPY = new Vector(round(nPYgids*ratioPYPY*nPYgids*synSpread_L))
+    delPYIN = new Vector(round(nPYgids*ratioPYIN*nFSgids*synSpread_L))
+    delINPY = new Vector(round(nFSgids*ratioINPY*nPYgids*synSpread_L))
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[2]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,delPYPY.size()-1 {
+                x = normRepick(r)
+                delPYPY.x[i] = testDel(delayPYPY + 0.2*delayPYPY*x, delayPYPY)
+            }
+            for i = 0,delPYIN.size()-1 {
+                x = normRepick(r)
+                delPYIN.x[i] = testDel(delayPYIN + 0.2*delayPYIN*x, delayPYIN)
+            }
+            for i = 0,delINPY.size()-1 {
+                x = normRepick(r)
+                delINPY.x[i] = testDel(delayINPY + 0.2*delayINPY*x, delayINPY)
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,delPYPY.size()-1 {
+                delPYPY.x[i] = testDel(delayPYPY, delayPYPY)
+            }
+            for i = 0,delPYIN.size()-1 {
+                delPYIN.x[i] = testDel(delayPYIN, delayPYIN)
+            }
+            for i = 0,delINPY.size()-1 {
+                delINPY.x[i] = testDel(delayINPY, delayINPY)
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(delPYPY, 0)
+        pc.broadcast(delPYIN, 0)
+        pc.broadcast(delINPY, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc weiNet() {local i, x     // Set the synaptic weights
+    weiPYPY = new Vector(round(nPYgids*ratioPYPY*nPYgids*synSpread_L))
+    weiPYIN = new Vector(round(nPYgids*ratioPYIN*nFSgids*synSpread_L))
+    weiINPY = new Vector(round(nFSgids*ratioINPY*nPYgids*synSpread_L))
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[3]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,weiPYPY.size()-1 {
+                x = normRepick(r)
+                weiPYPY.x[i] = testWei((1 + 0.05*x)*PYPYfact)
+            }
+            for i = 0,weiPYIN.size()-1 {
+                x = normRepick(r)
+                weiPYIN.x[i] = testWei((1 + 0.05*x)*PYINfact)
+            }
+            for i = 0,weiINPY.size()-1 {
+                x = normRepick(r)
+                weiINPY.x[i] = testWei((1 + 0.05*x)*INPYfact)
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,weiPYPY.size()-1 {
+                weiPYPY.x[i] = testWei(PYPYfact)
+            }
+            for i = 0,weiPYIN.size()-1 {
+                weiPYIN.x[i] = testWei(PYINfact)
+            }
+            for i = 0,weiINPY.size()-1 {
+                weiINPY.x[i] = testWei(INPYfact)
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(weiPYPY, 0)
+        pc.broadcast(weiPYIN, 0)
+        pc.broadcast(weiINPY, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc ampNet() {local i, x     // Set the ISO amplitude
+    ampPYPY = new Vector(round(nPYgids*ratioPYPY*nPYgids*synSpread_L))
+    ampPYIN = new Vector(round(nPYgids*ratioPYIN*nFSgids*synSpread_L))
+    ampINPY = new Vector(round(nFSgids*ratioINPY*nPYgids*synSpread_L))
+    if ((pProc && pc.id == 0) || !pProc) {
+        if (randomise.x[6]) {
+            {r.Random123(randomInstance,0)}
+            r.normal(0,1)
+            for i = 0,ampPYPY.size()-1 {
+                x = normRepick(r)
+                ampPYPY.x[i] = testWei((1 + 0.01*x)*PYPYamp)
+            }
+            for i = 0,ampPYIN.size()-1 {
+                x = normRepick(r)
+                ampPYIN.x[i] = testWei((1 + 0.01*x)*PYINamp)
+            }
+            for i = 0,ampINPY.size()-1 {
+                x = normRepick(r)
+                ampINPY.x[i] = testWei((1 + 0.01*x)*INPYamp)
+            }
+            randomInstance += 1
+        } else {
+            for i = 0,ampPYPY.size()-1 {
+                ampPYPY.x[i] = testWei(PYPYamp)
+            }
+            for i = 0,ampPYIN.size()-1 {
+                ampPYIN.x[i] = testWei(PYINamp)
+            }
+            for i = 0,ampINPY.size()-1 {
+                ampINPY.x[i] = testWei(INPYamp)
+            }
+        }
+    }
+    if (pProc) {
+        {pc.barrier()}
+        pc.broadcast(ampPYPY, 0)
+        pc.broadcast(ampPYIN, 0)
+        pc.broadcast(ampINPY, 0)
+        {pc.barrier()}
+    }
+}
+
+
+
+proc connectNet() {localobj amps
+    // Create PY-PY AMPA and NMDA synapses and connect them to the source:
+    createSyns(PYcells, nodePYgids, "GLU", P_release_L, ampPYPY, pc)
+    ncPYPY = connectSyns(PYcells, PYgids, PYcells, PYgids, ratioPYPY, "GLU", delPYPY, weiPYPY, 0, pc, randomise.x[4], synSpread_L, P_release_L, ampPYPY, edge)
+    if (randomise.x[4]) {
+        createSyns(PYcells, nodePYgids, "AMPA", P_release_L, amps, pc)
+        weight = (1/smooth)*0.22 // 0.22: ~0.15mV
+        ncPYminisAMPAout = connectMinis(PYcells, 0.6, weight, "AMPA")
+        ncPYPY.append(ncPYminisAMPAout)
+    }
+
+    // Create PY-IN AMPA and NMDA synapses and connect them to the source:
+    createSyns(FScells, nodeFSgids, "GLU", P_release_L, ampPYIN, pc)
+    ncPYIN = connectSyns(PYcells, PYgids, FScells, FSgids, ratioPYIN, "GLU", delPYIN, weiPYIN, 1, pc, randomise.x[4], synSpread_L, P_release_L, ampPYIN, edge)
+    if (randomise.x[4]) {
+        createSyns(FScells, nodeFSgids, "AMPA", P_release_L, amps, pc)
+        weight = (1/smooth)*0.18 // 0.18: ~0.15mV
+        ncINminisAMPAout = connectMinis(FScells, 0.6, weight, "AMPA")
+        ncPYIN.append(ncINminisAMPAout)
+    }
+
+    // Create IN-PY GABAa and GABAb synapses and connect them to the source:
+    ncINPY = connectSyns(FScells, FSgids, PYcells, PYgids, ratioINPY, "GABA", delINPY, weiINPY, 0, pc, randomise.x[4], synSpread_L, P_release_L, ampINPY, edge)
+    if (randomise.x[4]) {
+        createSyns(PYcells, nodePYgids, "GABAa", P_release_L, amps, pc)
+        weight = (1/smooth)*0.14 // 0.14: 0.15mV @ -65mV
+        ncPYminisGABAaout = connectMinis(PYcells, 0.6, weight, "GABAa")
+        ncINPY.append(ncPYminisGABAaout)
+    }
+}
+
+
+
+proc createNet() {
+    delNet()
+    weiNet()
+    ampNet()
+    connectNet()
+}
+
+
+
+proc setLists() {
+    if (!strcmp(layerType, "L23")) {
+        ratioPYPY_L23 = ratioPYPY
+        ratioPYIN_L23 = ratioPYIN
+        cellLists_L23 = cellLists
+        nodeGidLists_L23 = nodeGidLists
+        gidLists_L23 = gidLists
+        cellTypeInd_L23 = cellTypeInd
+        ncPYPY_L23 = ncPYPY
+        ncPYIN_L23 = ncPYIN
+        ncINPY_L23 = ncINPY
+    } else if (!strcmp(layerType, "L4")) {
+        ratioPYPY_L4 = ratioPYPY
+        ratioPYIN_L4 = ratioPYIN
+        cellLists_L4 = cellLists
+        nodeGidLists_L4 = nodeGidLists
+        gidLists_L4 = gidLists
+        cellTypeInd_L4 = cellTypeInd
+        ncPYPY_L4 = ncPYPY
+        ncPYIN_L4 = ncPYIN
+        ncINPY_L4 = ncINPY
+    } else if (!strcmp(layerType, "L5") || !strcmp(layerType, "pL5")) {
+        ratioPYPY_L5 = ratioPYPY
+        ratioPYIN_L5 = ratioPYIN
+        cellLists_L5 = cellLists
+        nodeGidLists_L5 = nodeGidLists
+        gidLists_L5 = gidLists
+        cellTypeInd_L5 = cellTypeInd
+        ncPYPY_L5 = ncPYPY
+        ncPYIN_L5 = ncPYIN
+        ncINPY_L5 = ncINPY
+    } else if (!strcmp(layerType, "L6") || !strcmp(layerType, "pL6")) {
+        ratioPYPY_L6 = ratioPYPY
+        ratioPYIN_L6 = ratioPYIN
+        cellLists_L6 = cellLists
+        nodeGidLists_L6 = nodeGidLists
+        gidLists_L6 = gidLists
+        cellTypeInd_L6 = cellTypeInd
+        ncPYPY_L6 = ncPYPY
+        ncPYIN_L6 = ncPYIN
+        ncINPY_L6 = ncINPY
+    }
+}
+
+
+
+proc createLayer() {
+    initParam($s1)
+    createCells()
+    createNet()
+    setLists()
+}

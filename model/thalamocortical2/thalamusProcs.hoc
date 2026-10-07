@@ -1,0 +1,202 @@
+// Perform thalamus related computing and simulation routines
+
+
+
+objref TCdataList, NRTdataList, stim, stimList, clamp, TCclampList, NRTclampList
+stimList = new List()
+TCclampList = new List()
+NRTclampList = new List()
+
+{ load_file("thalamus.hoc") }
+
+if (varDt) {
+    cvode.atolscale("cai", 0.001)
+}
+
+
+
+/*  A procedure for running the minimal NRT model consisting of 2 NRT cells.
+    Inputs:
+    $1 - the number to be added at the beginning of each data file;
+    $2 - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc minimalNRT() {
+        NRTdataList = dataMulti(NRTcells, NRTclampList, $2)
+        if (pProc) {
+            prun()
+        } else {
+            run()
+        }
+        if (saveData) {
+            saveMulti(NRTdataList, NRTcells, $1, $2)
+        }
+    }
+
+
+
+/*  A procedure for running the minimal thalamic model capable of generating
+    sleep spindles. Inputs:
+    $1 - the number to be added at the beginning of each data file;
+    $2 - a logical for saving data (0 - no, 1 - yes (full), 2 - yes (minimal)). */
+    proc minimalSpindle() {
+        TCdataList = dataMulti(TCcells, TCclampList, $2)
+        NRTdataList = dataMulti(NRTcells, NRTclampList, $2)
+        if (pProc) {
+            prun()
+        } else {
+            run()
+        }
+        if (saveData) {
+            saveMulti(TCdataList, TCcells, $1, $2)
+            saveMulti(NRTdataList, NRTcells, $1, $2)
+        }
+    }
+
+
+
+/*  A procedure for exploring the parameter space of sleep spindle
+    oscillations with respect to the apparent input resistance of a cell. */
+    proc spindleRi() {local i, j  localobj cell
+        for (i = 160; i <= 240; i += 10) {
+            if (pProc) {
+                for j = 0, ncells-1 {
+                    if (pc.gid_exists(TCgids.x[j], pc.id)) {
+                        cell = pc.gid2obj(TCgids.x[j])
+                        cell.soma.g_pas = i*1e-7
+                    }
+                }
+            } else {
+                //TCcells.o(0).soma.g_pas = 259*1e-7
+                //TCcells.o(1).soma.g_pas = 259*1e-7
+                TCcells.o(0).soma.g_pas = i*1e-7
+                TCcells.o(1).soma.g_pas = i*1e-7
+                //NRTcells.o(0).soma.g_pas = i*1e-7
+                //NRTcells.o(1).soma.g_pas = i*1e-7
+            }
+            minimalSpindle(i, saveData)
+        }
+    }
+
+
+
+/*  A procedure for exploring the parameter space of sleep spindle
+    oscillations with respect to the strength of the synaptic connection. */
+    proc spindleSyn() {local i
+        TCcells.o(0).soma.g_pas = 259*1e-7
+        TCcells.o(1).soma.g_pas = 259*1e-7
+        for (i = 0; i <= 5; i += 1) {
+            ncNRTGABAa = connectSyns(NRTcells, NRTgids, TCcells, TCgids, fanoutNRTGABA, 0, 2.5, i, 1, pc)
+            //ncTCAMPA = connectSyns(TCcells, TCgids, NRTcells, NRTgids, fanoutTCGLUT, 0, 1, i, 1, pc)
+            //ncNRTGABAb = connectSyns(NRTcells, NRTgids, TCcells, TCgids, fanoutNRTGABA, 1, 2.5, i, 1, pc)
+            //ncTCNMDA = connectSyns(TCcells, TCgids, NRTcells, NRTgids, fanoutTCGLUT, 1, 1, i, 1, pc)
+            //ncNRTNRT = connectSyns(NRTcells, NRTgids, NRTcells, NRTgids, fanoutNRTNRT, 2, 1, i, 0, pc)
+            minimalSpindle(i, saveData)
+        }
+    }
+
+
+
+/*  A procedure for exploring the parameter space of sleep spindle
+    oscillations with respect to the strength of the I_AHP conductance in NRT. */
+    proc spindleIntr() {local i
+        //ncNRTNRT = connectSyns(NRTcells, NRTgids, NRTcells, NRTgids, fanoutNRTNRT, 0, 1, 0.2, 0, pc)
+        //ncNRTGABAa = connectSyns(NRTcells, NRTgids, TCcells, TCgids, fanoutNRTGABA, 0, 2.5, 0.2, 1, pc)
+        TCcells.o(0).soma.g_pas = 259*1e-7
+        TCcells.o(1).soma.g_pas = 259*1e-7
+        for (i = 0; i <= 550; i += 50) {
+            //NRTcells.o(0).soma.gcabar_its = i
+            //NRTcells.o(1).soma.gcabar_its = i
+            //NRTcells.o(0).soma.shift_iar = i
+            //NRTcells.o(1).soma.shift_iar = i
+            //NRTcells.o(0).soma.ghbar_iar = i*1e-7
+            //NRTcells.o(1).soma.ghbar_iar = i*1e-7
+            //NRTcells.o(0).soma.gkbar1_iahp = i
+            //NRTcells.o(1).soma.gkbar1_iahp = i
+            //TCcells.o(0).soma.pcabar_itGHK = i
+            //TCcells.o(1).soma.pcabar_itGHK = i
+            //TCcells.o(0).soma.shift_iar = i
+            //TCcells.o(1).soma.shift_iar = i
+            TCcells.o(0).soma.ghbar_iar = i*1e-6
+            TCcells.o(1).soma.ghbar_iar = i*1e-6
+            minimalSpindle(i, saveData)
+        }
+    }
+
+
+
+/*  A procedure for exploring the parameter space of sleep spindle
+    oscillations. */
+    proc testSpindle() {
+        //spindleRi()
+        //spindleSyn()
+        spindleIntr()
+    }
+
+
+
+if (modelType == 3) {
+    if (!pProc) {
+        addGraph("NRTcells.o(0).soma.v(0.5)",      0, 1104/2, 1770/2, 910/2)
+        addGraph("NRTcells.o(1).soma.v(0.5)", 1982/2, 1104/2, 1770/2, 910/2)
+    }
+    clamp = delClamp(NRTcells.o(0), 0, 0, 0, 0, 0)
+    NRTclampList.append(clamp)
+    if (runMode == 0) {
+        for i = 1, NRTcells.count()-1 {
+            clamp = delClamp(NRTcells.o(i), 0, 0, 0, 0, 0)
+            NRTclampList.append(clamp)
+        }
+    } else if (runMode == 2) {
+        stim = stimSingle(NRTcells.o(0), 5e3, 100, 0.05)
+        clamp = vClamp(NRTcells.o(1), 10e3, 0, 0, -60, -60, -60)
+        NRTclampList.append(clamp)
+    }
+    minimalNRT(0, saveData)
+
+} else if (modelType == 4) {
+    if (!pProc) {
+        addGraph("TCcells.o(0).soma.v(0.5)",       0,      0, 1770/2, 910/2)
+        addGraph("TCcells.o(1).soma.v(0.5)",  1982/2,      0, 1770/2, 910/2)
+    }
+    for i = 0, TCcells.count()-1 {
+        if (i > 0 || (i == 0 && runMode != 2)) {
+            clamp = delClamp(TCcells.o(i), 0, 0, 0, 0, 0)
+            TCclampList.append(clamp)
+        }
+    }
+    if (!pProc) {
+        addGraph("NRTcells.o(0).soma.v(0.5)",      0, 1104/2, 1770/2, 910/2)
+        addGraph("NRTcells.o(1).soma.v(0.5)", 1982/2, 1104/2, 1770/2, 910/2)
+    }
+    for i = 0, NRTcells.count()-1 {
+        //if (i > 0 || (i == 0 && runMode != 2)) {
+            clamp = delClamp(NRTcells.o(i), 0, 0, 0, 0, 0)
+            NRTclampList.append(clamp)
+        //}
+    }
+    if (runMode == 0) {
+        minimalSpindle(0, saveData)
+    } else if (runMode == 2) {
+        //stim = stimSingle(NRTcells.o(0), 5e3, 100, 0.05)
+        stim = stimSingle(NRTcells.o(0), 5e3, 100, 2.4)
+        stimList.append(stim)
+        clamp = vClamp(TCcells.o(0), 10e3, 0, 0, -60, -60, -60)
+        TCclampList.prepend(clamp)
+        stim = stimSingle(TCcells.o(1), 0, 10e3, 0.028)
+        stimList.append(stim)
+
+        /*stim = stimSingle(TCcells.o(0), 5e3, 10, 1)
+        stimList.append(stim)
+        clamp = vClamp(NRTcells.o(0), 10e3, 0, 0, -60, -60, -60)
+        NRTclampList.prepend(clamp)
+        stim = stimSingle(NRTcells.o(1), 0, 10e3, 0.175)    // @ -40 mV
+        //stim = stimSingle(NRTcells.o(1), 0, 10e3, 0.045)    // @ -60 mV
+        //stim = stimSingle(NRTcells.o(1), 0, 10e3, -0.37)    // @ -95 mV
+        stimList.append(stim)*/
+        minimalSpindle(0, saveData)
+    } else if (runMode == 6) {
+        testSpindle()
+    }
+
+} else if (modelType == 5) {
+
+}

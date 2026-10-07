@@ -1,0 +1,725 @@
+/*----------------------------------------------------------------------------
+
+    CORTICAL EXCITATORY CELL #3
+	=================================
+
+	Simulations of a double-compartment model of a cortical excitatory cell.
+
+    This model cell is used in the thalamocortical network model. It is
+    based on earlier cortical cell models outlined in [1] and [2].
+    Important additional membrane current, like I_h and I_K[Na], were
+    incorporated into the model in order to reproduce intrinsic oscillatory
+    behaviour observed in [3] and the involvement of I_K[Na] in the
+    termination of the slow oscillation [4].
+
+    The model consists of two, dendritic and axo-somatic, compartments
+    coupled via resistance, kappa, and related via the ratio of the
+    membrane surface areas, rho. The cell may have a different membrane
+    potential response depending on the values of these parameters. Hence,
+    it may be classed as regular-spiking (RS), intrinsically bursting (IB),
+    or fast-spiking (FS). For more details see ref. [1].
+
+    The cell is adapted to be used in parallel network simulations if
+    necessary.
+    
+    The following active currents are included in the model (the references
+    describing the models are provided in the descriptions of the model
+    (.mod) files:
+        - HH mechanism: fast Na+ I_Na and K+ delayed rectifier I_K(DR)
+            currents. Required for action potential generation.
+        - I_A: fast A-type K+ current.
+        - I_M: slow non-inactivating muscarine-sensitive K+ current.
+        - I_K[Ca]: Ca2+-activated K+ current.
+        - I_K[Na]: Na+-activated K+ current.
+        - I_HVA: high threshold calcium current.
+        - I_h: anaomalous rectifier current (hyperpolarisation-activated
+               non-specific cation current).
+        - I_Na(P): persistent low voltage-activated Na+ current.
+        - I_AMPA
+        - I_NMDA
+        - I_GABAa
+        - I_GABAb
+
+    Optional currents:
+        - I_AR: outward rectifier K+ current.
+
+    Input:
+    $1 - a type of the cell: 8  - default Cx3 cell;
+                             9  - single RS cell;
+                             10 - single IB cell2;
+                             11 - single RIB cell;
+                             12 - pacemaker cell;
+                             13 - single FS cell.
+    $2 - a global identifier.
+
+    References:
+    [1] Mainen, Z.F. and Sejnowski, T.J. Influence of dendritic structure
+        on firing pattern in model neocortical neurons. Nature, 382: 363-
+        366, 1996.
+    [2] Timofeev, I., Bazhenov, G.M., Sejnowski, T.J., and Steriade, M.
+        Origin of Slow Cortical Oscillations in Deafferented Cortical Slabs.
+        Cerebral Cortex, 10: 1185-1199, 2000.
+    [3] Lőrincz, M.L., Gunner, D., Bao, Y., Hughes, S.W., and Crunelli, V.
+        A distinct class of slow (~0.2-2 Hz) bursting layer 5 pyramidal
+        neurons determine UP/DOWN state dynamics in the neocortex.
+        In preparation.
+    [4] Cunningham, M.O., Pervouchine, D.D., Racca, C., Kopell, N.J.,
+        Davies, C.H., Jones, R.S., Traub, R.D., and Whittington, M.A.
+        Neuronal metabolism governs cortical network response state.
+        PNAS, 103: 5597-5601, 2006.
+
+    Written by Martynas Dervinis @Cardiff University, 2014.
+
+    *notes:
+    *1  - given enarev = 60, ekrev = -90, ecarev = 140, rho = 158
+          forall { g_pas = 0.000026425, e_pas = ekrev, cm = 0.75,
+            g_naleak = 0.0000078, e_naleak = 10, nseg = 1 }
+          soma { diam = 5.644, L = 5.644, depth_nad = 2.5, taux_nad = 500,
+            ena = enarev, ek = ekrev, gnabar_hhCx = 3, gkbar_hhCx = 0.216,
+            gkbar_iknaCx3 = 0.00007, gnabar_inapCx2 = 0.000077 }
+          dend { diam = soma.diam, L = rho*soma.L, depth_cad = 2.5,
+            taux_cad = 200, cainf_cad = 50e-6, depth_nad = 2.5,
+            taux_nad = 1000, ena = enarev, ek = ekrev, gnabar_hhCx = 0.0015,
+            gkbar_hhCx = 0, gkbar_ikf = 0.00148, gkbar_im = 0.00001,
+            ekb = ekrev, cac2_iahp = 0.00032, power_iahp = 5.3,
+            gkbar1_iahp = 0, gkbar2_iahp = 0, tau_m2_min_iahp = 830,
+            gkbar_ikca = 0.015, gkbar_iknaCx3 = 0.00007, ghbar_iarCx3 = 0,
+            gcabar_ihvaCx = 0.000001, gnabar_inapCx2 = 0.000077 }
+          >> Vrest = -71.5 mV, Ri = 264.2 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 140.45 with stim.amp = -0.02 nA @ Vrest
+                               tau = 15.05 ms @ Vrest
+    *2  - g_pas = 0.000027425, ghbar_iarCx3 = 0.0001
+          >> Vrest = -65.3 mV, Ri = 144.93 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 67.41 with stim.amp = -0.02 nA @ Vrest
+                               tau = 9.92 ms @ Vrest
+    *3  - rho = 160, g_pas = 0.000028925, ghbar_iarCx3 = 0,
+          gkbar_ikca = 0.015, gcabar_ihvaCx = 0.00001
+          >> Vrest = -72.8 mV, Ri = 237.05 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 131.47 with stim.amp = -0.02 nA @ Vrest
+                               tau = 15.54 ms @ Vrest
+    *4  - rho = 200
+          >> Vrest = -72.7 mV, Ri = 193.1 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 109.78 with stim.amp = -0.02 nA @ Vrest
+                               tau = 13.69 ms @ Vrest
+    *5  - rho = 165, g_pas = 0.000027425, gkbar_ikca = 0.009,
+          gcabar_ihvaCx = 0.000034, ghbar_iarCx3 = 0.0003
+          >> Vrest = -61.5 mV, Ri = 81.34 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 63.08 with stim.amp = -0.02 nA @ Vrest
+                               tau = 10.27 ms @ Vrest
+    *6  - rho = 120, g_pas = 0.000026425, gkbar_ikca = 0.0015,
+          gcabar_ihvaCx = 0.000001, ghbar_iarCx3 = 0, gnabar_inapCx2 = 0
+          >> Vrest = -72.1 mV, Ri = 188.36 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 167.63 with stim.amp = -0.02 nA @ Vrest
+                               tau = 14.68 ms @ Vrest
+    *7  - rho = 163.8, g_pas = 0.000028925, ghbar_iarCx3 = 0,
+          gkbar_ikca = 0.015, gcabar_ihvaCx = 0.00001
+          >> Vrest = -72.8 mV, Ri = 233.32 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 128.92 with stim.amp = -0.02 nA @ Vrest
+                               tau = 15.5 ms @ Vrest
+    *8  - rho = 170
+          >> Vrest = -72.8 mV, Ri = 224.01 with stim.amp = -0.02 nA @ -60 mV
+                               Ri = 125 with stim.amp = -0.02 nA @ Vrest
+                               tau = 15.45 ms @ Vrest
+    *9  - rho = 195
+          >> Vrest = -72.74 mV, Ri = 198.4 with stim.amp = -0.02 nA @ -60 mV
+                                Ri = 111.95 with stim.amp = -0.02 nA @ Vrest
+                                tau = 13.67 ms @ Vrest
+    
+----------------------------------------------------------------------------*/
+
+
+
+begintemplate Cx3cell
+public soma, dend, gid, enarev, ekrev, rho, rlist, input, is_art
+public createSyn, getSyn, getSynList, connect2target
+public createMini, getMini, connectMini, inserted, rcount, rlist
+external varDt, randomise, globalIndex, max, lambda_f
+
+objref AMPAsyn, GLUsyn, GABAAsyn, GABAsyn
+objref AMPAsynList, GLUsynList, GABAAsynList, GABAsynList, synList
+objref AMPAmini, GABAAmini, minisList, rlist, input, inserted
+
+create soma, dend
+
+proc init() {
+    modelType = $1
+    gid = $2
+    insertNil = 1
+    insertExC = 1
+    insertHH = 1
+    insertIA = 1
+    insertIM = 1
+    insertIKCa = 1
+    insertIKNa = 1
+    insertIHVA = 1
+    insertIh = 1
+    insertINaP = 1
+    insertIAR = 0
+    insertIT = 1
+    inserted = new Vector(16)
+    AMPAsynList = new List()
+    GLUsynList = new List()
+    GABAAsynList = new List()
+    GABAsynList = new List()
+    synList = new List()
+    minisList = new List()
+    rlist = new List()
+    input = new List()
+    input.append(synList)
+    input.append(minisList)
+    rcount = 0
+
+    enarev = 60
+    ekrev  = -90
+    ecarev = 140
+    if (modelType == 8) {
+        rho = 160
+    } else if (modelType == 9 || modelType == 10) {
+        rho = 160   // RS & EF
+    } else if (modelType == 11) {
+        rho = 165  // IB
+    } else if (modelType == 12) {
+        rho = 170   // RIB
+    } else if (modelType == 13) {
+        rho = 160 	// ND
+    } else if (modelType == 14) {
+        rho = 120   // FS: 120 - 15.62 Hz, 110 - 19.53Hz, 100 - 24.41Hz, 50 - >50Hz, 30 - >60Hz, 10 - 100Hz, 1 - >130Hz
+    } else if (modelType == 15) {
+        rho = 175   // SIB
+    } else if (modelType == 16) {
+        rho = 165   // LTS
+    }
+
+    soma {
+        diam = 5.644    // um
+        L = 5.644       // um
+    }
+
+    dend {
+        diam = soma.diam
+        L = rho*soma.L
+    }
+    
+    connect dend(0), soma(1)
+
+
+
+    if (insertNil) {
+        forall {
+            insert pas                                                      // Passive properties and nonspecific leak current
+            inserted.x[0] = 1
+            if (gid < 300) {
+                reduce = 0.000014
+            } else {
+                reduce = 0.000014
+            }
+            if (modelType == 8) {
+                g_pas = 0.0000293
+            } else if (modelType == 9) {    // RS
+                g_pas = 0.0000293 //- 0.000008 - reduce
+            } else if (modelType == 10) {   // EF
+                g_pas = 0.0000133 //- max(0,reduce-(0.00002-0.0000133))
+            } else if (modelType == 11) {   // IB
+                g_pas = 0.0000293 //- 0.000006 - reduce
+            } else if (modelType == 12) {   // RIB
+                g_pas = 0.0000293 //- 0.000006 - reduce
+            } else if (modelType == 13) {   // ND
+                g_pas = 0.0000124 //- reduce/3
+            } else if (modelType == 14) {   // FS
+                g_pas = 0.0000293 //- 0.000006 - reduce
+            } else if (modelType == 15) {   // SIB
+                g_pas = 0.0000293 //- 0.000006 - reduce
+            } else if (modelType == 16) {   // LTS
+                g_pas = 0.0000293 //- 0.000006 - reduce
+            
+            }
+            e_pas = ekrev
+            cm = 0.75
+            if (modelType == 12 || modelType == 15) {
+                Ra = 55 //45-65; old: 60
+            } else {
+                Ra = 55
+            }
+
+            insert naleak                                                   // Na+ leak current
+            inserted.x[1] = 1
+            if (modelType == 13) {   // ND
+                g_naleak = 0.0000042
+            } else if (modelType == 16) {   // LTS
+                g_naleak = 0.0000073
+            } else {
+                g_naleak = 0.0000078
+            }
+            e_naleak = 10
+        }
+
+        soma {
+            insert nad                                                      // Intracellular [Na+] decay
+            inserted.x[2] = 1
+            depth_nad = 2.5
+            taux_nad = 500
+        }
+
+        dend {
+            insert cad                                                      // Intracellular [Ca2+] decay
+            inserted.x[3] = 1
+            depth_cad = 2.5
+            taux_cad = 200                                                  
+            cainf_cad = 50e-6
+
+            insert nad                                                      // Intracellular [Na+] decay
+            depth_nad = 0.03
+            taux_nad = 1000
+        }
+    }
+
+
+
+    if (insertExC && !varDt) {
+        forall {
+            insert extracellular                                            // Extracellular fields for monitoring total membrane current
+            inserted.x[4] = 1
+        }
+    }
+
+
+
+    if (insertHH) {
+        soma {                                                              // HH mechanism
+            insert hhCx
+            inserted.x[5] = 1
+            ena = enarev
+            ek = ekrev
+            gnabar_hhCx = 3
+            gkbar_hhCx = 0.216                                              // new: 0.216; old: 0.15
+        }
+
+        dend {0.000016
+            insert hhCx
+            ena = enarev
+            ek = ekrev
+            gnabar_hhCx = 0.0015
+            gkbar_hhCx = 0
+        }
+    }
+
+
+
+    if (insertIA) {
+        dend {                                                              // I_A
+            insert ikf
+            inserted.x[6] = 1
+            ek = ekrev
+            gkbar_ikf = 0.00148                                             // new: 0.00148; old: 0
+        }
+    }
+
+
+
+    if (insertIM) {
+        dend {                                                              // I_M
+            insert im
+            inserted.x[7] = 1
+            ek = ekrev
+            gkbar_im = 0.00001
+        }
+    }
+
+
+
+    if (insertIKCa) {
+        dend {                                                              // I_K[Ca]
+            if (modelType == 13) {
+                insert iahp
+                inserted.x[8] = 1
+                ekb = ekrev
+                cac2_iahp = 0.00115                                         // Should be adjusted depending on the [Ca2+]i fluctuations
+                power_iahp = 5.3
+                gkbar1_iahp = 0
+                gkbar2_iahp = 3*0.00003
+                tau_m2_min_iahp = 830
+            }
+
+            insert ikca
+            inserted.x[9] = 1
+            ek = ekrev
+            if (modelType == 8) {
+                gkbar_ikca = 0.000001                                       // new: 0.000003; old: 0.000003
+            } else if (modelType == 9) {    // RS
+                gkbar_ikca = 0.000001
+            } else if (modelType == 10) {   // EF
+                gkbar_ikca = 0.000001
+            } else if (modelType == 11) {   // IB
+                gkbar_ikca = 0.000001
+            } else if (modelType == 12) {   // RIB
+                gkbar_ikca = 0.000001
+            } else if (modelType == 13) {   // ND
+                gkbar_ikca = 3*0.000003
+            } else if (modelType == 14) {   // FS
+                gkbar_ikca = 0.000001
+            } else if (modelType == 15) {   // SIB
+                gkbar_ikca = 0.000001
+            } else if (modelType == 16) {   // LTS
+                gkbar_ikca = 0.000001
+            }
+        } 
+    }
+
+
+
+    if (insertIKNa) {
+        soma {                                                              // I_K[Na]
+            insert iknaCx3
+            inserted.x[10] = 1
+            ek = ekrev
+            gkbar_iknaCx3 = 0.000015 //0.00007                              // new: 0.0001; old: 0
+        }
+
+        dend {
+            insert iknaCx3
+            ek = ekrev 
+            gkbar_iknaCx3 = 0.000015 //0.00007                              // new: 0.0001; old: 0
+        }
+    }
+
+
+
+    if (insertIHVA) {
+        dend {                                                              // I_HVA
+            insert ihvaCx
+            inserted.x[11] = 1
+            eca = ecarev
+            if (modelType == 8) {
+                gcabar_ihvaCx = 0.000001                                    // new: ; old: 0.00001
+            } else if (modelType == 9) {    // RS
+                gcabar_ihvaCx = 0.000001
+            } else if (modelType == 10) {   // EF
+                gcabar_ihvaCx = 0.000001
+            } else if (modelType == 11) {   // IB
+                gcabar_ihvaCx = 0.00001
+            } else if (modelType == 12) {   // RIB
+                gcabar_ihvaCx = 0.00001
+            } else if (modelType == 13) {   // ND
+                gcabar_ihvaCx = 0.000015
+            } else if (modelType == 14) {   // FS
+                gcabar_ihvaCx = 0.000001
+            } else if (modelType == 15) {   // SIB
+                gcabar_ihvaCx = 0.000015
+            } else if (modelType == 16) {   // LTS
+                gcabar_ihvaCx = 0.00001
+            }
+        }
+    }
+
+
+
+    if (insertIh) {
+        dend {                                                              // I_h
+            insert iarCx3CaD
+            inserted.x[12] = 1
+            eh = -30
+            halfAct_iarCx3CaD = -91
+            ginc_iarCx3CaD = 2
+            cac_iarCx3CaD = 0.002500
+            k2_iarCx3CaD = 0.000150
+            Pc_iarCx3CaD = 0.017
+            k4_iarCx3CaD = 0.00007
+            if (modelType == 8) {
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 9) {    // RS
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 10) {   // EF
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 11) {   // IB
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 12) {   // RIB
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 13) {   // ND
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 14) {   // FS
+                ghbar_iarCx3CaD = 0
+            } else if (modelType == 15) {   // SIB
+                ghbar_iarCx3CaD = 0.00002
+            } else if (modelType == 16) {   // LTS
+                ghbar_iarCx3CaD = 0.00002
+            }
+        }
+    }
+
+
+
+    if (insertINaP) {
+        soma {                                                              // I_Na(P)
+            if (!(modelType == 14)) {   // FS
+                insert inapCx2
+                inserted.x[13] = 1
+                ena = enarev
+                gnabar_inapCx2 = 0.000077
+            }
+        }
+
+        dend {
+            if (!(modelType == 14)) {   // FS
+                insert inapCx2
+                ena = enarev
+                gnabar_inapCx2 = 0.000077
+            }
+        }
+    }
+
+
+
+    if (insertIAR) {
+        dend {                                                              // I_AR
+            insert ior
+            inserted.x[14] = 1
+            ek = ekrev
+            gkbar_ior = 0.002
+        }
+    }
+
+    if (insertIT) {
+        dend {
+            insert itGHK                                                    // LVA I_T with GHK equations
+            inserted.x[15] = 1
+            if (modelType == 8) {
+                pcabar_itGHK = 0.1e-5
+            } else if (modelType == 9) {    // RS
+                pcabar_itGHK = 0.1e-5
+            } else if (modelType == 10) {   // EF
+                pcabar_itGHK = 0.1e-5
+            } else if (modelType == 11) {   // IB
+                pcabar_itGHK = 1e-5
+            } else if (modelType == 12) {   // RIB
+                pcabar_itGHK = 1e-5
+            } else if (modelType == 13) {   // ND
+                pcabar_itGHK = 0.1e-5
+            } else if (modelType == 14) {   // FS
+                pcabar_itGHK = 0
+            } else if (modelType == 15) {   // SIB
+                pcabar_itGHK = 1e-5
+            } else if (modelType == 16) {   // LTS
+                pcabar_itGHK = 4e-5
+            }
+        }
+    }
+
+    //forall nseg = int((L/(0.1*lambda_f(100))+0.9)/2)*2 + 1                  // Lambda rule
+    forall nseg = 1
+}
+
+obfunc connect2target() {localobj nc //$o1 - target process, $2 - connection delay, $3 - connection weight, $s4 - the synapse type
+    soma nc = new NetCon(&v(0.5), $o1)
+    nc.threshold = -10
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+obfunc connectMini() {localobj nc //$s1 - type of synapse, $2 - connection delay, $3 - connection weight
+    if (!strcmp($s1,"AMPA")) {
+        nc = new NetCon(AMPAmini, AMPAsyn)
+    } else if (!strcmp($s1,"GLU")) {
+        nc = new NetCon(AMPAmini, GLUsyn)
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA")) {
+        nc = new NetCon(GABAAmini, GABAAsyn)
+    }
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+proc createAMPAsyn() {localobj r // $1 - release probability
+    dend AMPAsyn = new AMPA_S(0.5)
+    AMPAsyn.gbar = 0.001945         // 18.57, 0.73, 4.58: 0.001945, 0.94, 0.22, 0.5, 0.55, 0
+    AMPAsyn.Alpha = 0.94
+    AMPAsyn.Beta = 0.22
+    AMPAsyn.Cmax = 0.5
+    AMPAsyn.Cdur = 0.55
+    AMPAsyn.Erev = 0
+    if (randomise.x[5]) {
+        AMPAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        AMPAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    AMPAsynList.append(AMPAsyn)
+    synList.append(AMPAsyn)
+}
+
+proc createGLUsyn() {localobj r // $1 - release probability
+    dend GLUsyn = new GLU_S2(0.5)
+    GLUsyn.gbar_a = 0.001945        // 18.57, 0.73, 4.58: 0.001945, 0.94, 0.22, 0.5, 0.55, 0, 1
+    GLUsyn.Alpha_a = 0.94
+    GLUsyn.Beta_a = 0.22
+    GLUsyn.Cmax_a = 0.5
+    GLUsyn.Cdur_a = 0.55
+    GLUsyn.Erev_a = 0
+    GLUsyn.weight_a = 1
+    GLUsyn.d1_a = 0.78
+    GLUsyn.d2_a = 0.97
+    GLUsyn.tau_D1_a = 634
+    GLUsyn.tau_D2_a = 9300
+    GLUsyn.d1_b = 0.2               // 4.06, 2.44, 40: 0.2, 2500, 1.0327, 2.2364, 25.057, 43.495, 232.27, 1, 1, 0.05, 0.000043
+	GLUsyn.tau_D1_b = 2500          // 4.02, 3.01, 50.05: 0.2, 2500, 1.5, 2.2364, 25.057, 43.495, 232.27, 1, 1, 0.05, 0.000044
+	GLUsyn.tau1_init_b = 3          // 4.05, 4.16, 63.71: 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 1, 0.05, 0.000051
+	GLUsyn.a2_b = 2.2364
+	GLUsyn.tau2_0_b = 25.057
+	GLUsyn.a3_b = 43.495
+	GLUsyn.tau3_0_b = 232.27
+    GLUsyn.tauAdj_b = 1
+    GLUsyn.gf_b = 1
+    GLUsyn.Mg_b = 2
+    GLUsyn.weight_b = 0.000051
+    if (randomise.x[5]) {
+        GLUsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GLUsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GLUsynList.append(GLUsyn)
+    synList.append(GLUsyn)
+}
+
+proc createGABAAsyn() {localobj r // $1 - release probability
+    soma GABAAsyn = new GABAa_S(0.5)
+    GABAAsyn.gbar = 0.068           // 37.15, 0.55, 6.25: 0.068, 0.1, 0.2, 0.5, 0.8, -80
+    GABAAsyn.Alpha = 0.1
+    GABAAsyn.Beta = 0.2
+    GABAAsyn.Cmax = 0.5
+    GABAAsyn.Cdur = 0.8
+    GABAAsyn.Erev = -80
+    if (randomise.x[5]) {
+        GABAAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GABAAsynList.append(GABAAsyn)
+    synList.append(GABAAsyn)
+}
+
+proc createGABAsyn() {localobj r    // $1 - release probability
+    soma GABAsyn = new GABA_S(0.5)
+    GABAsyn.gbar_a = 0.068      //  37.15, 0.55, 6.25: 0.068, 0.1, 0.2, 0.5, 0.8, -80, 1
+    GABAsyn.Alpha_a = 0.1
+    GABAsyn.Beta_a = 0.2
+    GABAsyn.Cmax_a = 0.5
+    GABAsyn.Cdur_a = 0.8
+    GABAsyn.Erev_a = -80
+    GABAsyn.weight_a = 1.25
+    GABAsyn.gbar_b = 0.0027     //  2.02, 59, 37.9, 105.2, 35.4, 127.9: 0.0065, 0.18, 0.0025, 0.19, 0.06, 17.83, 4, -90, 0.5, 0.8
+                                //  2.01, 41.5, 30.7, 81.9, 56.6, 90.1: 0.0027, 0.18, 0.0025, 0.19, 0.06, 17.83, 8, -90, 0.5, 0.8
+    GABAsyn.d = 0.94
+    GABAsyn.tau_D = 1900
+    GABAsyn.K1_b = 0.18         //	(/ms mM) forward binding rate to receptor (original: 0.18)
+    GABAsyn.K2_b = 0.0025       //	(/ms)	 backward (unbinding) rate of receptor (original: 0.0096)
+    GABAsyn.K3_b = 0.19         //	(/ms)	 rate of G-protein production (original: 0.19)
+    GABAsyn.K4_b = 0.06         //	(/ms)	 rate of G-protein decay (original: 0.06)
+    GABAsyn.KD_b = 17.83        //           dissociation constant of K+ channel (original: 17.83)
+    GABAsyn.n_b = 8             //           nb of binding sites of G-protein on K+ (original: 4)
+    GABAsyn.Erev_b = ekrev      //	(mV)	 reversal potential (E_K)
+    GABAsyn.Cmax_b = 0.5        //           short pulses (original: 0.5)
+    GABAsyn.Cdur_b = 0.8        //           (original: 0.8)
+    if (randomise.x[5]) {
+        GABAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GABAsynList.append(GABAsyn)
+    synList.append(GABAsyn)
+}
+
+proc createSyn() {    // $s1 - the synapse type, $2 - release probability.
+    if (!strcmp($s1,"AMPA")) {
+        createAMPAsyn($2)
+    } else if (!strcmp($s1,"GLU")) {
+        createGLUsyn($2)
+    } else if (!strcmp($s1,"GABAa")) {
+        createGABAAsyn($2)
+    } else if (!strcmp($s1,"GABA")) {
+        createGABAsyn($2)
+    }
+}
+
+obfunc getSyn() {localobj syn   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        syn = AMPAsyn
+    } else if (!strcmp($s1,"GLU")) {
+        syn = GLUsyn
+    } else if (!strcmp($s1,"GABAa")) {
+        syn = GABAAsyn
+    } else if (!strcmp($s1,"GABA")) {
+        syn = GABAsyn
+    }
+    return syn
+}
+
+obfunc getSynList() {localobj list   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        list = AMPAsynList
+    } else if (!strcmp($s1,"GLU")) {
+        list = GLUsynList
+    } else if (!strcmp($s1,"GABAa")) {
+        list = GABAAsynList
+    } else if (!strcmp($s1,"GABA")) {
+        list = GABAsynList
+    } else {
+        list = synList
+    }
+    return list
+}
+
+proc createMini() {localobj mini, r	// $s1 - the synapse type, $2 - number of input streams.
+    mini = new minis()
+    mini.noise = 1
+    mini.interval1 = 1*200*$2
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU")) {
+        mini.interval2 = 1*50*$2
+    } else {
+        mini.interval2 = 1*50*$2
+    }
+    r = new Random()
+    {r.Random123_globalindex(globalIndex)}
+    {r.Random123(rcount, gid)}
+    r.negexp(1)
+    mini.noiseFromRandom(r)
+    rlist.append(r)
+    rcount += 1
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU")) {
+    	AMPAmini = mini
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA")) {
+        GABAAmini = mini
+    }
+    minisList.append(mini)
+}
+
+obfunc getMini() {localobj mini     // $s1 - the synapse type
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU")) {
+    	mini = AMPAmini
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA")) {
+        mini = GABAAmini
+    }
+    return mini
+}
+
+func is_art() { return 0 }
+
+endtemplate Cx3cell

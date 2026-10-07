@@ -1,0 +1,812 @@
+/*----------------------------------------------------------------------------
+
+	NUCLEUS RETICULARIS THALAMI (NRT) CELL
+	=======================================
+
+	Simulations of a single-compartment model of reticular thalamic cell.
+
+    The geometric and passive parameters of this model cell were set to
+    give the membrane capacitance of < 70 pF since the reported values in
+    the literature range between 60 and 70 pF. The paprameters of K+ leak
+    current should be adjusted and used in combination with the second
+    Na+ leak current to obtain a range of input resistances that support
+    various oscillations. The voltage dependence of I_h current should also
+    be adjusted to reflect neuromodulatory effects on this current [1].
+
+    The cell is adapted to be used in parallel network simulations if
+    necessary.
+    
+    The following active currents are included in the model (the references
+    describing the models are provided in the descriptions of the model
+    (.mod) files:
+        - HH mechanism (fast Na+ I_Na and K+ delayed rectifier I_K(DR)
+            currents). Required for action potential generation.
+        - I_Ts: slow low voltage-activated Ca2+ T-type current. Required
+            for low-threshold calcium spikes, rebound bursting, and a
+            number of oscillations including delta and slow (< 1 Hz).
+        - I_h anaomalous rectifier current (hyperpolarisation-activated
+            non-specific cation current). It is an essential pacemaking
+            current working in cooperation with I_Ts and involved in
+            generating the same oscillations as I_Ts.
+        - I_AHP: or I_K[Ca] is a Ca2+-activated K+ current. In NRT cells it
+            is coupled to I_Ts channels and works together to produce
+            dampened intrinsic spindle rhythmicity, as well as expand the
+            frequency range of the delta oscillation.
+        - I_CAN: slow Ca2+ dependent non-specific cation current. This
+            current is required for expanding the range of slow (< 1 Hz)
+            oscillations.
+        - I_Na(P): persistent low voltage-activated Na+ current. This
+            current boosts the Up states of the slow oscillation.
+        - I_K[Na]: a prominent current in NRT cells producing prolonged
+            Down states during the slow oscillation and the slow
+            afterhyperpolarisation following sleep spindles in vitro.
+        - I_HVA[Ca]: non-specific high voltage-activated Ca2+ current.
+        - I_AMPA
+        - I_NMDA
+        - I_GABAa
+        
+
+    References:
+    [1] McCormick, D.A., Pape, H.-C. Noradrenergic and serotonergic
+        modulation of a hyperpolarization-activated cation current in
+        thalamic relay neurones. Journal of Physiology. 431: 319-342, 1990.
+
+    Written by Martynas Dervinis @Cardiff University, 2013.
+
+    *notes:
+    *1  - given diam = 42, L = 63, cm = 0.88, Ra = 150, celsius = 35,
+          depth_cad = 12, taux_cad = 5, cainf_cad = 50e-6,
+          g_pas = 0.00005836, e_pas = -90, g_naleak = 0.0000185, e_naleak = 10,
+          ena = 30, ek = -90, vtraubNa_hhT = -42, vtraubK_hhT = -38,
+          gnabar_hhT = 0.07, gkbar_hhT = 0.07, cao = 1.5, shift_its = 0,
+          gcabar_its = 0.000422, adj_its = 1, ekb = -90, cac_iahp = 0.00032,
+          power_iahp = 5.3, gkbar1_iahp = 0.0015, gkbar2_iahp = 3.1*gkbar1_iahp,
+          beta1_iahp = 0.05, beta2_iahp = 0.0012, tau_min_iahp = 5.
+          >> Vrest = -65, Ri = 160.5 with stim.amp = -0.02 nA
+                          Ri = 162.6 with stim.amp = -0.05 nA
+                          (Crunelli's way of estimating Ri)
+    *2  - depth_cad = 3.6, taux_cad = 2, cainf_cad = 50e-6,
+          g_pas = 0.00005836, e_pas = -90, g_naleak = 0.0000184, e_naleak = 10,
+          vtraubNa_hhT = -38, vtraubK_hhT = -38, gnabar_hhT = 0.07,
+          gkbar_hhT = 0.07, ghbar_iar = 0.0000014, shift_iar = -10,
+          cac1_iahp = 0.0002, cac2_iahp = 0.0002, power_iahp = 5.3,
+          gkbar1_iahp = 0.0024, gkbar2_iahp = 0, tau_m1_iahp = 19.4,
+          tau_m2_iahp = 830.
+          >> Vrest = -65, Ri = 157.7 with stim.amp = -0.02 nA
+                          Ri = 160.7 with stim.amp = -0.05 nA
+    *3  - g_pas = 0.0000852, e_pas = -90, g_naleak = 0.0000219, e_naleak = 10,
+          vtraubNa_hhT = -50, vtraubK_hhT = -50, gnabar_hhT = 0.04,
+          gkbar_hhT = 0.04, gkbar1_iahp = 0, gkbar2_iahp = 0, en = 10,
+          gnbar_ican = 0.00005, k1_ican = 1e11, k2_ican = 0.005,
+          k3_ican = 0.0015, k4_ican = 0.00123, enaINaP_inap = 30,
+          gnabar_inap = 0.00001612, shift_inap = 0.
+          >> Vrest = -65, Ri = 160.3 with stim.amp = -0.02 nA
+                          Ri = 154.7 with stim.amp = -0.05 nA
+    *4  - g_pas = 0.000119, e_pas = -90, g_naleak = 0.0000332, e_naleak = 10.
+          >> Vrest = -65, Ri = 100.4 with stim.amp = -0.02 nA
+                          Ri = 99.5 with stim.amp = -0.05 nA
+    *5  - g_pas = 0.000259, e_pas = -90, g_naleak = 0.00008, e_naleak = 10.
+          >> Vrest = -65, Ri = 39.2 with stim.amp = -0.02 nA
+                          Ri = 39.2 with stim.amp = -0.05 nA
+    *6  - g_pas = 0.0000695, e_pas = -90, g_naleak = 0.0000167, e_naleak = 10.
+          >> Vrest = -65, Ri = 219.8 with stim.amp = -0.02 nA
+                          Ri = 202.8 with stim.amp = -0.05 nA
+    *7  - g_pas = 0.0000585, e_pas = -90, g_naleak = 0.000013, e_naleak = 10.
+          >> Vrest = -65, Ri = 294.9 with stim.amp = -0.02 nA
+                          Ri = 252.6 with stim.amp = -0.05 nA
+    *8  - g_pas = 0.0000434, e_pas = -90, g_naleak = 0.000008, e_naleak = 10.
+          >> Vrest = -65, Ri = 496.3 with stim.amp = -0.02 nA
+                          Ri = 343 with stim.amp = -0.05 nA
+    *9  - g_pas = 0.0000576, e_pas = -90, g_naleak = 0.0000175, e_naleak = 10,
+          cac1_iahp = 0.0002, cac2_iahp = 0.0002, power_iahp = 5.3,
+          gkbar1_iahp = 0.0003, gkbar2_iahp = 0, depth_nad = .1,
+          taux_nad = 7000, nainf_nad = 10, gkbar_ikna = 0.0005,
+          shift_p_ikna = 0, shift_n_ikna = 0, inactRate_ikna = 12,
+          vDep_ikna = 0, naDep_ikna = 1, inact_ikna = 1.
+          >> Vrest = -65, Ri = 160.4 with stim.amp = -0.02 nA
+                          Ri = 161.2 with stim.amp = -0.05 nA
+    *10 - g_pas = 0.0000925, e_pas = -90, g_naleak = 0.0000224, e_naleak = 10,
+          depth_cap = 21, cainf_cap = 50e-6, KT1_cap = 7e-4, KT2_cap = 0,
+          Kd1_cap   = 10000e-6, Kd2_cap   = 500e-6, enaHH_hhT = 30,
+          ek = ekrev, vtraubNa_hhT = -50, vtraubK_hhT = -50,
+          gnabar_hhT = 0.03, gkbar_hhT = 0.03, cai = 50e-6, cao = 1.5,
+          mshift_its = 0, hshift_its = 0, gcabar_its = 0.00069, adj_its = 0,
+          ghbar_iar = 0.000014, shift_iar = -10, cac1_iahp = 0.00032,
+          cac2_iahp = 0.00032, power_iahp = 5.3, gkbar1_iahp = 0.00015,
+          gkbar2_iahp = 0, tau_m1_min_iahp = 11.65, tau_m2_min_iahp = 830,
+          en = 10, gnbar_ican = 0.000037, k1_ican = 1e11, k2_ican = 0.005,
+          k3_ican = 0.0015, k4_ican = 0.001, enaINaP_inap = 30,
+          gnabar_inap = 0.000033, shift_inap = 0, depth_nad = .1,
+          taux_nad = 7000, nainf_nad = 10, ek = ekrev, gkbar_ikna = 0.0002,
+          shift_p_ikna = 0, shift_n_ikna = 0, inactRate_ikna = 12,
+          vDep_ikna = 0, naDep_ikna = 1, inact_ikna = 1,
+          pcabar_ihvaNRT = 0.0002, act_ihvaNRT = 1, shift_ihvaNRT = 15.
+          >> Vrest = -65, Ri = 160.2 with stim.amp = -0.02 nA
+                          Ri = 154.6 with stim.amp = -0.05 nA
+    *11 - g_pas = 0.0000970, e_pas = -90, g_naleak = 0.0000200, e_naleak = 10,
+          ghbar_iar = 0.000020, shift_iar = 0, gkbar_ikna = 0.00007.
+          >> Vrest = -65, Ri = 161 with stim.amp = -0.02 nA
+                          Ri = 140.9 with stim.amp = -0.05 nA
+    *12 - g_pas = 0.000143, e_pas = -90, g_naleak = 0.000035, e_naleak = 10
+          >> Vrest = -65, Ri = 93.34 with stim.amp = -0.02 nA
+                          Ri = 88.27 with stim.amp = -0.05 nA
+    *13 - g_pas = 0.000068, e_pas = -90, g_naleak = 0.0000145, e_naleak = 10,
+          gnabar_inap = 0.00001612, shift_inap = 0, depth_nad = .1.
+          >> Vrest = -65, Ri = 179.7 with stim.amp = -0.02 nA
+                          Ri = 155.58 with stim.amp = -0.05 nA
+    *14 - g_pas = 0.00014, e_pas = -90, g_naleak = 0.0000385, e_naleak = 10.
+          >> Vrest = -65, Ri = 75.7 with stim.amp = -0.02 nA
+                          Ri = 73.8 with stim.amp = -0.05 nA
+    *15 - g_pas = 0.0000980, e_pas = -90, g_naleak = 0.0000200, e_naleak = 10.
+          gnabar_inap = 0.000033.
+          >> Vrest = -65, Ri = 164.45 with stim.amp = -0.02 nA
+                          Ri = 142.19 with stim.amp = -0.05 nA
+    *16 - g_pas = 0.0000488, e_pas = -90, g_naleak = 0.000012, e_naleak = 10,
+          gnbar_ican = 0, gnabar_inap = 0, gkbar_ikna = 0, pcabar_ihvaNRT = 0.
+          >> Vrest = -65, Ri = 159.74 with stim.amp = -0.02 nA
+                          Ri = 146.78 with stim.amp = -0.05 nA
+    *17 - g_pas = 0.000015, e_pas = -90, g_naleak = 0.00000083, e_naleak = 10.
+          >> Vrest = -65, Ri = 333.65 with stim.amp = -0.02 nA
+                          Ri = 247.79 with stim.amp = -0.05 nA
+    *18 - enarev = 60, ekrev = -90, diam = 42, L = 63, e_pas = ekrev,
+          g_pas = 0.000089, cm = 0.88, Ra = 150, g_naleak = 0.0000233, 
+          e_naleak = 10, depth_cad = 17, taux_cad = 133, cainf_cad = 50e-6,
+          enaHH_hhT = 30, ek = ekrev, vtraubNa_hhT = -50, vtraubK_hhT = -50,
+          gnabar_hhT = 0.03, gkbar_hhT = 0.03, cai = 50e-6, cao = 1.5,
+          mshift_its = 0, hshift_its = 0, taum_shift_its = 0,
+          tauh_shift_its = 0, gcabar_its = 0.00069, adj_its = 0,
+          ghbar_iarg = 0.00001, shift_iarg = -18, ginc_iarg = 2,
+          cainf_iarg = 90e-6, cac_iarg = 0.001450, k2_iarg = 0.000150,
+          Pc_iarg = 0.017, k4_iarg = 0.00007, nca_iarg = 4, nexp_iarg = 1,
+          ekb = ekrev, cac1_iahp = 0.001, cac2_iahp = 0.00032,
+          power_iahp = 5.3, beta1_iahp = 0.05, beta2_iahp = 0.0012,
+          gkbar1_iahp = 0.0002, gkbar2_iahp = 0, tau_m1_min_iahp = 90,      <--
+          tau_m2_min_iahp = 830, en = 10, gnbar_ican = 0.000012,            <--
+          k1_ican = 1e11, k2_ican = 0.005, k3_ican = 0.0015,
+          k4_ican = 0.00123, enaINaP_inap = 30, gnabar_inap = 0.00001612,   <--
+          shift_inap = 0, depth_nad = .1, taux_nad = 7000, nainf_nad = 10,
+          ek = ekrev, gkbar_ikna = 0, shift_p_ikna = 0, shift_n_ikna = 0,   <--
+          inactRate_ikna = 12, vDep_ikna = 0, naDep_ikna = 1,
+          inact_ikna = 1, pcabar_ihvaNRT = 0.0002, act_ihvaNRT = 1,
+          shift_ihvaNRT = 15, nseg = 1.
+          >> Vrest = -65, Ri = 160.62 with stim.amp = -0.02 nA
+                          Ri = 155.56 with stim.amp = -0.05 nA
+    *19 - g_pas = 0.000089, g_naleak = 0.0000233, gkbar1_iahp = 0.
+          >> Vrest = -65, Ri = 160.67 with stim.amp = -0.02 nA
+                          Ri = 155.53 with stim.amp = -0.05 nA
+    *20 - g_pas = 0.000071, g_naleak = 0.00002, gkbar1_iahp = 0.0002,
+          gnbar_ican = 0.000007, gnabar_inap = 0.000007.
+          >> Vrest = -65, Ri = 158.47 with stim.amp = -0.02 nA
+                          Ri = 162.79 with stim.amp = -0.05 nA
+    *21 - enarev = 60, ekrev = -90, diam = 42, L = 63, e_pas = ekrev,
+          g_pas = 0.000084, cm = 0.88, Ra = 150, g_naleak = 0.00001935,
+          e_naleak = 10, depth_cad = 17, taux_cad = 133, cainf_cad = 50e-6,
+          depth_cadhva = 17, taux_cadhva = 133, cainf_cadhva = 0,
+          enaHH_hhT = 30, ek = ekrev, vtraubNa_hhT = -50, vtraubK_hhT = -50,
+          gnabar_hhT = 0.03, gkbar_hhT = 0.03, cai = 50e-6, cao = 1.5,
+          mshift_its = -3, hshift_its = 0, taum_shift_its = 0, 
+          tauh_shift_its = 0, speedUpm_its = 1, speedUph_its = 1,
+          gcabar_its = 0.00069, adj_its = 0, ghbar_iarg = 0.0000043,
+          shift_iarg = 0, ginc_iarg = 2, cainf_iarg = 90e-6,
+          cac_iarg = 1450, k2_iarg = 0.000150, Pc_iarg = 0.017,
+          k4_iarg = 0.00007, nca_iarg = 4, nexp_iarg = 1, ekb = ekrev,
+          cac1_iahp = 0.001, cac2_iahp = 0.00032, power_iahp = 5.3,
+          beta1_iahp = 0.05, beta2_iahp = 0.0012, gkbar1_iahp = 0.0002,
+          gkbar2_iahp = 0, tau_m1_min_iahp = 5, tau_m2_min_iahp = 830,
+          cac_icanm = 0.00045, beta_icanm = 0.0001, taumin_icanm = 0.1,
+          en = 0, gbar_icanm = 0.0001, enaINaP_inap = 30,
+          gnabar_inap = 0.000015, shift_inap = 0, depth_nad = .1,
+          taux_nad = 7000, nainf_nad = 10, ek = ekrev, gkbar_ikna = 0,
+          shift_p_ikna = 0, shift_n_ikna = 0, inactRate_ikna = 12,
+          vDep_ikna = 0, naDep_ikna = 1, inact_ikna = 1,
+          pcabar_ihvaNRT = 0.0002, act_ihvaNRT = 1, shift_ihvaNRT = 15,
+          nseg = 1.
+          >> Vrest = -65, Ri = 159.44 with stim.amp = -0.02 nA
+                          Ri = 160.47 with stim.amp = -0.05 nA
+
+----------------------------------------------------------------------------*/
+
+begintemplate NRTcell
+public soma, gid, devRi, enarev, ekrev, input, is_art
+public createSyn, getSyn, getSynList, connect2target
+public createMini, getMini, connectMini, appendGapList, getGapList, inserted, rcount, rlist
+external varDt, randomise, globalIndex, min, lambda_f, state
+
+objref AMPAsyn, GLUsyn, GLUfullsyn, GABAAsyn
+objref AMPAsynList, GLUsynList, GLUfullsynList, GABAAsynList, synList
+objref AMPAmini, GABAAmini, minisList, gapList, rlist, input, inserted
+strdef section
+
+create soma
+
+proc init() {
+    gid = $1
+    devRi = $2
+    type = $3
+    section = $s4
+    insertNil = 1
+    insertExC = 1
+    insertHH = 1
+    insertITs = 1
+    insertIh = 1
+    insertIAHP = 1
+    insertICAN = 1
+    insertINaP = 1
+    insertIKNa = 1
+    insertIHVA = 1
+    inserted = new Vector(13)
+    AMPAsynList = new List()
+    GLUsynList = new List()
+    GLUfullsynList = new List()
+    GABAAsynList = new List()
+    synList = new List()
+    minisList = new List()
+    gapList = new List()
+    rlist = new List()
+    input = new List()
+    input.append(synList)
+    input.append(minisList)
+    rcount = 0
+    
+    enarev = 60
+    ekrev = -90
+
+    soma {
+        diam = 42
+        L = 63
+    }
+
+    if (insertNil) {
+        forall {
+            insert pas                                                      // Passive properties and K+ leak current
+            inserted.x[0] = 1
+            e_pas = ekrev
+            g_pas = 0 //0.525*0.000084 //0.4475*0.000084 //0.375*0.000084 //0.000084
+            cm = 0.88
+            Ra = 150
+
+            insert naleak                                                   // Na+ leak current
+            inserted.x[1] = 1
+            if (!strcmp(state,"slow_short") || !strcmp(state,"slow_long")) {
+                g_naleak = 0.000004
+            } else if (!strcmp(state,"SWDs_short") || !strcmp(state,"SWDs_long") || !strcmp(state,"wake_short") || !strcmp(state,"wake_long")) {
+                g_naleak = 0
+            } else {
+                g_naleak = 0
+            }
+            e_naleak = 10
+
+            /*insert cap                                                      // Intracellular [Ca2+] decay
+            inserted.x[2] = 1
+            depth_cap = 21                                                  // Adjust so that the [Ca2+]_i accumulation is ~713 nM during a typical LTCP
+            cainf_cap = 50e-6
+            KT1_cap   = 7e-4
+            KT2_cap   = 0 //5e-6
+            Kd1_cap   = 10000e-6
+            Kd2_cap   = 500e-6 */
+
+            insert cad                                                      // Intracellular [Ca2+] decay
+            inserted.x[2] = 1
+            depth_cad = 5.75    //5.75 //10.1 //11.15 //13.1 //14.75 //17
+            taux_cad = 30       //30   //50   //60    //80   //100   //133
+            cainf_cad = 50e-6
+
+            insert cadhva                                                   // Intracellular [Ca2+] decay
+            depth_cadhva = 5.75 //5.75 //10.1 //11.15 //13.1 //14.75 //17
+            taux_cadhva = 30    //30   //50   //60    //80   //100   //133
+            cainf_cadhva = 0e-6
+        }
+    }
+
+    if (insertExC && !varDt) {
+        forall {
+        	insert extracellular                                            // Extracellular fields for monitoring total membrane current
+            inserted.x[3] = 1
+        }
+    }
+
+	if (insertHH) {
+        soma {                                                              // HH mechanism
+            insert hhT
+            inserted.x[4] = 1
+            enaHH_hhT = 30
+            ek = ekrev
+            vtraubNa_hhT = -50
+            vtraubK_hhT = -50
+            gnabar_hhT = 0.05
+            gkbar_hhT = 0.05                                                // possible working sets: 30 -90 -50 -50 0.04 0.04
+        }
+    }
+
+    if (insertITs) {
+        forall {
+            insert its                                                      // LVA I_Ts current
+            inserted.x[5] = 1
+            cai = 50e-6 
+            cao = 1.5                                                       // Original parameters: 
+            mshift_its = 0                                                  // 0
+            hshift_its = 0                                                  // 0
+            taum_shift_its = 0
+            tauh_shift_its = 0
+            speedUpm_its = 1
+            speedUph_its = 1
+            gcabar_its = 2*0.00069                                          // 0.0013: 9.947 nA; 0.00069: 5.576 nA
+            adj_its = 0                                                     // 0
+        }
+    }
+
+    if (insertIh) {
+        forall {
+            /*insert iarreg                                                   // I_h (Na+/K+) current
+            inserted.x[6] = 1
+            ghbar_iarreg  = 0.0000200                                       // Max: 0.0000486 (~260 pA), Min: 0.0000043 (~23 pA). 0.000014: ~75 pA.
+            shift_iarreg  = 0 */
+
+            insert iarg
+            inserted.x[6] = 1
+            ghbar_iarg    = 0.0000043
+            shift_iarg    = 0
+            ginc_iarg     = 2
+            cainf_iarg    = 90e-6
+            cac_iarg      = 0.001750                                        // Valid range: 0.001750-0.006000.
+            k2_iarg       = 0.000150
+            Pc_iarg       = 0.017
+            k4_iarg       = 0.00007
+            nca_iarg      = 8
+            nexp_iarg	  = 1
+        }
+    }
+
+    if (insertIAHP) {
+        forall {
+            insert iahp                                                     // Burst I_AHP mediated by SK channels
+            inserted.x[7] = 1
+            ekb = ekrev
+            cac1_iahp = 0.001                                               // Should be adjusted depending on the [Ca2+]i fluctuations
+            cac2_iahp = 0.00032
+            power1_iahp = 5.3
+            power2_iahp = 5.3
+            beta1_iahp = 0.05
+            beta2_iahp = 0.0012
+            if (!strcmp(state,"none")) {
+                gkbar1_iahp = 0.0003
+                gkbar2_iahp = 0.00003
+            } else if (!strcmp(state,"delta_short")) {
+                gkbar1_iahp = 0.01*0.0003                                   //Slow:0; Spindles:0.0003; SWDs:0.0003
+                gkbar2_iahp = 0.01*0.00006                                  //Slow:0; Spindles:0.00003-0.0001; SWDs:0.00018 //min:0.05*gkbar1_iahp; max:0.23*gkbar1_iahp
+            } else if (!strcmp(state,"delta_long")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.01*0.00006
+            } else if (!strcmp(state,"slow_short")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.01*0.00006
+            } else if (!strcmp(state,"slow_long")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.01*0.00006
+            } else if (!strcmp(state,"spindles_short")) {
+                gkbar1_iahp = 0.0003
+                gkbar2_iahp = 0.01*0.00006
+            } else if (!strcmp(state,"spindles_long")) {
+                gkbar1_iahp = 0.0003
+                gkbar2_iahp = 0.01*0.00006
+            } else if (!strcmp(state,"SWDs_short")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.00006
+            } else if (!strcmp(state,"SWDs_long")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.00006
+            } else if (!strcmp(state,"wake_short")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.00006
+            } else if (!strcmp(state,"wake_long")) {
+                gkbar1_iahp = 0.01*0.0003
+                gkbar2_iahp = 0.00006
+            }
+            tau_m1_min_iahp = 15
+            tau_m2_min_iahp = 830
+        }
+    }
+
+    if (insertICAN) {
+        forall {
+            /* insert ican                                                     // Nonspecific cation current I_CAN
+            inserted.x[8] = 1
+            en = 10
+            gnbar_ican = 0.000012                                           // SWD working set: gnbar_ican = 0.000007, 1e11, 0.005, 0.0015, 0.00123
+            k1_ican = 1e11                                                  // old: gnbar_ican = 0.000012, 1e11, 0.005, 0.0015, 0.00123
+            k2_ican = 0.005                                                 // TC: gnbar_ican = ???, 1e11, 0.01, 0.0015, 0.0007
+            k3_ican = 0.0015                                                // fast: gnbar_ican = ???, 1e11, 0.01, 0.25, 0.0123
+            k4_ican = 0.00123 */
+
+            insert icanmNRT                                                 // nonspecific cation current ICAN
+            cac_icanmNRT = 0.00045
+            beta_icanmNRT = 0.000004
+            taumin_icanmNRT = 0.1
+            inact_icanmNRT = 0
+            tau_hCa_icanmNRT = 1000
+            en = 0
+            gbar_icanmNRT = 0.475*0.0001
+        }
+    }
+
+    if (insertINaP) {
+        soma {                                                              // I_Na(P) Na+ low threshold persistent current
+            insert inap
+            inserted.x[9] = 1
+            enaINaP_inap = 30                                               // SWD working set: enaINaP_inap = 30, gnabar_inap = 0.000007 (standard is 0.000015), shift_inap = 0
+            gnabar_inap = 0.00001612                                        // 0.000033: 160.55 pA (max); 0.000021: 102.17 pA; 0.00001612: 78.43 pA.
+            shift_inap = 0                                                  // ranges from -3 to 3
+        }
+    }
+
+    if (insertIKNa) {
+        forall {
+            insert nad                                                      // Intracellular [Na+] decay
+            inserted.x[10] = 1
+            depth_nad = .1
+            taux_nad = 10000                                                // Has to be very slow (5000-10000 ms)
+            nainf_nad = 10
+
+            /* insert ikna                                                     // Na+ activated K+ current I_K[Na]
+            inserted.x[11] = 1
+            ek = ekrev
+            gkbar_ikna = 5*0.00015
+            shift_p_ikna = 0
+            shift_n_ikna = 0
+            inactRate_ikna = 12
+            vDep_ikna = 0
+            naDep_ikna = 1
+            inact_ikna = 1 */
+
+            insert iknaThCx
+            inserted.x[10] = 1
+            ek = ekrev
+            gkbar_iknaThCx = 0.01*0.00001
+            nai_half_iknaThCx = 30
+            nai_exp_iknaThCx = 5
+        }
+    }
+
+    if (insertIHVA) {
+        forall {
+            insert ihvaNRT                                                  // I_HVA[Ca]
+            inserted.x[12] = 1
+            pcabar_ihvaNRT = 0.0002                                         // 0.0002: 2570.9 pA
+            act_ihvaNRT = 1
+            shift_ihvaNRT = 15
+        }
+    }
+
+    //forall nseg = int((L/(0.1*lambda_f(100))+0.9)/2)*2 + 1                  // Lambda rule
+    forall nseg = 1
+}
+
+obfunc connect2target() {localobj nc //$o1 - target process, $2 - connection delay, $3 - connection weight
+    soma nc = new NetCon(&v(0.5), $o1)
+    nc.threshold = -14.5
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+obfunc connectMini() {localobj nc //$s1 - type of synapse, $2 - connection delay, $3 - connection weight
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLUfull")) {
+        nc = new NetCon(AMPAmini, AMPAsyn)
+    } else if (!strcmp($s1,"GLU")) {
+        nc = new NetCon(AMPAmini, GLUsyn)
+    } else if (!strcmp($s1,"GABAa")) {
+        nc = new NetCon(GABAAmini, GABAAsyn)
+    }
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+proc createAMPAsyn() {localobj r // $1 - release probability    // TC>>NRT 4:1 Cx>>NRT (amplitude)
+    soma AMPAsyn = new AMPA_S(0.5)
+    AMPAsyn.gbar = 0.04
+    AMPAsyn.Alpha = 10
+    AMPAsyn.Beta = 3
+    AMPAsyn.Cmax = 0.5
+    AMPAsyn.Cdur = 0.3
+    AMPAsyn.Erev = 0
+    if (randomise.x[5]) {
+        AMPAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        AMPAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    AMPAsynList.append(AMPAsyn)
+    synList.append(AMPAsyn)
+}
+
+proc createGLUsyn() {local wFactor  localobj r // $1 - release probability // TC>>NRT 4:1 Cx>>NRT (amplitude)
+    soma GLUsyn = new GLU_S2(0.5)
+    GLUsyn.gbar_a = 0.04    // 7.613mV, 0.5ms, 15ms: 0.04, 10, 3, 0.5, 0.3, 0, 1, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 1
+    GLUsyn.Alpha_a = 10     // 7.721mV, 0.6ms, 10.78ms: 0.04, 10, 3, 0.5, 0.3, 0, 1, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0
+    GLUsyn.Beta_a = 3       // 1.625mV, 0.6ms, 13ms: 0.04, 10, 3, 0.5, 0.3, 0, 0.2, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0.2
+    GLUsyn.Cmax_a = 0.5
+    GLUsyn.Cdur_a = 0.3
+    GLUsyn.Erev_a = 0
+    GLUsyn.weight_a = 1
+	GLUsyn.tau1_init_b = 3
+	GLUsyn.a2_b = 2.2364
+	GLUsyn.tau2_0_b = 25.057
+	GLUsyn.a3_b = 43.495
+	GLUsyn.tau3_0_b = 232.27
+    GLUsyn.tauAdj_b = 1
+    GLUsyn.gf_b = 0.0003
+    GLUsyn.Mg_b = 0.5
+    GLUsyn.weight_b = 0.01 //1
+    if (randomise.x[5]) {
+        GLUsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GLUsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GLUsynList.append(GLUsyn)
+    synList.append(GLUsyn)
+}
+
+proc createGLUfullsyn() {local wFactor  localobj r // $1 - release probability // TC>>NRT 4:1 Cx>>NRT (amplitude)
+    soma GLUfullsyn = new GLU_S3(0.5)
+    GLUfullsyn.gbar_a = 0.04    // 7.613mV, 0.5ms, 15ms: 0.04, 10, 3, 0.5, 0.3, 0, 1, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 1
+    GLUfullsyn.Alpha_a = 10     // 7.721mV, 0.6ms, 10.78ms: 0.04, 10, 3, 0.5, 0.3, 0, 1, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0
+    GLUfullsyn.Beta_a = 3       // 1.625mV, 0.6ms, 13ms: 0.04, 10, 3, 0.5, 0.3, 0, 0.2, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0.2
+    GLUfullsyn.Cmax_a = 0.5
+    GLUfullsyn.Cdur_a = 0.3
+    GLUfullsyn.Erev_a = 0
+    GLUfullsyn.weight_a = 1
+    GLUfullsyn.u = 1 //1.7 //1.1
+    GLUfullsyn.tau_U = 50
+    GLUfullsyn.d1 = 1 //(1-(1-0.78)/1e9) //(1-(1-0.78)/6)
+    GLUfullsyn.d2 = 1 //(1-(1-0.97)/1e9) //(1-(1-0.97)/6)
+	GLUfullsyn.tau1_init_b = 3
+	GLUfullsyn.a2_b = 2.2364
+	GLUfullsyn.tau2_0_b = 25.057
+	GLUfullsyn.a3_b = 43.495
+	GLUfullsyn.tau3_0_b = 232.27
+    GLUfullsyn.tauAdj_b = 1
+    GLUfullsyn.gf_b = 0.0003
+    GLUfullsyn.Mg_b = 0.5
+    GLUfullsyn.weight_b = 0.01 //1
+    if (!strcmp(section, "FO")) {
+        if (type < 50) {
+            if (!strcmp(state,"none")) {
+                GLUfullsyn.gbase_c = 0.001
+            } else if (!strcmp(state,"delta_short")) {
+                GLUfullsyn.gbase_c = 0.0009                                 //Delta: 0.0006-0.0009; Slow: 0.0004; Spindles: 0.0004:; SWDs: 0.00015:0.00002
+            } else if (!strcmp(state,"delta_long")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"slow_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"slow_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"SWDs_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"SWDs_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            }
+        } else {
+            if (!strcmp(state,"none")) {
+                GLUfullsyn.gbase_c = 0.001
+            } else if (!strcmp(state,"delta_short")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"delta_long")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"slow_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"slow_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"SWDs_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"SWDs_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            }
+        }
+    } else if (!strcmp(section, "HO")) {
+        if (type < 50) {
+            if (!strcmp(state,"none")) {
+                GLUfullsyn.gbase_c = 0.001
+            } else if (!strcmp(state,"delta_short")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"delta_long")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"slow_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"slow_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"SWDs_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"SWDs_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            }
+        } else {
+            if (!strcmp(state,"none")) {
+                GLUfullsyn.gbase_c = 0.001
+            } else if (!strcmp(state,"delta_short")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"delta_long")) {
+                GLUfullsyn.gbase_c = 0.0009
+            } else if (!strcmp(state,"slow_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"slow_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_short")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"spindles_long")) {
+                GLUfullsyn.gbase_c = 0.0004
+            } else if (!strcmp(state,"SWDs_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"SWDs_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_short")) {
+                GLUfullsyn.gbase_c = 0.0002
+            } else if (!strcmp(state,"wake_long")) {
+                GLUfullsyn.gbase_c = 0.0002
+            }
+        }
+    }
+    GLUfullsyn.gbase_c = GLUfullsyn.gbase_c + 0.000001*devRi
+    GLUfullsyn.gbar_c = min(0.5*0.0014, 0.5*(GLUfullsyn.gbase_c/0.000285)*0.0014)  // *0.1232 (koefWeiNRT)
+    GLUfullsyn.K1_c = 0.05          // (/ms mM) forward binding rate to receptor
+    GLUfullsyn.K2_c = 0.002 //0.0001        // (/ms)	 backward (unbinding) rate of receptor
+    GLUfullsyn.K3_c = 0.03          // (/ms)	 rate of G-protein production
+    GLUfullsyn.K4_c = 0.03          // (/ms)	 rate of G-protein decay
+    GLUfullsyn.KD_c = 0.0001        //           dissociation constant of K+ channel
+    GLUfullsyn.n_c = 4              //           nb of binding sites of G-protein on K+
+    GLUfullsyn.Erev_c = ekrev       //	(mV)	 reversal potential (E_K)
+    GLUfullsyn.Cmax_c = 0.5         //           short pulses
+    GLUfullsyn.Cdur_c = 1.4
+    GLUfullsyn.weight_c = 1
+    if (randomise.x[5]) {
+        GLUfullsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GLUfullsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GLUfullsynList.append(GLUfullsyn)
+    synList.append(GLUfullsyn)
+    soma.g_pas = 0
+}
+
+proc createGABAAsyn() {localobj r // $1 - release probability
+    soma GABAAsyn = new GABAa_S(0.5)
+    GABAAsyn.gbar = 0.8     // 0.8, 0.01, 0.04, 0.5, 1.5, -70: 58.0513 pA, 1.19ms, 25.37 ms
+    GABAAsyn.Alpha = .01
+    GABAAsyn.Beta = 0.04
+    GABAAsyn.Cmax = 0.5
+    GABAAsyn.Cdur = 1.5
+    GABAAsyn.Erev = -70
+    if (randomise.x[5]) {
+        GABAAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GABAAsynList.append(GABAAsyn)
+    synList.append(GABAAsyn)
+}
+
+proc createSyn() {    // $s1 - the synapse type, $2 - release probability.
+    if (!strcmp($s1,"AMPA")) {
+        createAMPAsyn($2)
+    } else if (!strcmp($s1,"GLU")) {
+        createGLUsyn($2)
+    } else if (!strcmp($s1,"GLUfull")) {
+        createGLUfullsyn($2)
+    } else if (!strcmp($s1,"GABAa")) {
+        createGABAAsyn($2)
+    }
+}
+
+obfunc getSyn() {localobj syn   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        syn = AMPAsyn
+    } else if (!strcmp($s1,"GLU")) {
+        syn = GLUsyn
+    } else if (!strcmp($s1,"GLUfull")) {
+        syn = GLUfullsyn
+    } else if (!strcmp($s1,"GABAa")) {
+        syn = GABAAsyn
+    }
+    return syn
+}
+
+obfunc getSynList() {localobj list   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        list = AMPAsynList
+    } else if (!strcmp($s1,"GLU")) {
+        list = GLUsynList
+    } else if (!strcmp($s1,"GLUfull")) {
+        list = GLUfullsynList
+    } else if (!strcmp($s1,"GABAa")) {
+        list = GABAAsynList
+    } else {
+        list = synList
+    }
+    return list
+}
+
+proc createMini() {localobj mini, r	// $s1 - the synapse type, $2 - number of input streams.
+    mini = new minis()
+    mini.noise = 1
+    r = new Random()
+    {r.Random123_globalindex(globalIndex)}
+    {r.Random123(rcount, gid)}
+    r.negexp(1)
+    mini.noiseFromRandom(r)
+    rlist.append(r)
+    rcount += 1
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU") || !strcmp($s1,"GLUfull")) {
+        mini.interval1 = 150*$2
+        mini.interval2 = 75*$2
+    	AMPAmini = mini
+    } else if (!strcmp($s1,"GABAa")) {
+        mini.interval1 = 300*$2
+        mini.interval2 = 150*$2
+        GABAAmini = mini
+    }
+    minisList.append(mini)
+}
+
+obfunc getMini() {localobj mini     // $s1 - the synapse type
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU") || !strcmp($s1,"GLUfull")) {
+    	mini = AMPAmini
+    } else if (!strcmp($s1,"GABAa")) {
+        mini = GABAAmini
+    }
+    return mini
+}
+
+proc appendGapList() {
+    gapList.append($o1)
+}
+
+obfunc getGapList() {
+    return gapList
+}
+
+func is_art() { return 0 }
+
+endtemplate NRTcell

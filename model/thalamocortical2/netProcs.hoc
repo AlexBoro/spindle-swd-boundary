@@ -1,0 +1,443 @@
+// Custom routines for constructing cell networks
+
+
+
+/*  A routine for assigning global id (gid) to a particular cell during
+    parallel simulation so that the work is divided among all hosts as
+    equally as possible. Inputs:
+    $&1 - a reference to gid;
+    $o2 - the parallel context object (see NEURON documentation). */
+    iterator cellitr() {
+        for (gid = $o2.id; gid < startGid+ngids; gid += $o2.nhost) {
+            if (gid >= startGid) {
+                $&1 = gid
+                iterator_statement
+            }
+        }
+    }
+
+
+
+/*  A routine for testing and adjusting a synaptic delay. Input:
+    $1 - a chosen delay;
+    $2 - mean delay.
+    Output: a correct delay. */
+    func testDel() {local delay
+        delay = round(100*$1)/100
+        meanDel = $2
+        if (delay < 1) {
+            delay = 1
+        } else if (delay > 2*meanDel) {
+            delay = 2*meanDel
+        }
+        return delay
+    }
+
+
+
+/*  A routine for producing a vector of synaptic delays (ms). Inputs:
+    $1  - average delay (ms);
+    $2  - number of connections;
+    $o3 - prallel context object (see NEURON's documentation);
+    $4  - randomise delays: 1 - yes, 0 - no.
+    Output is a vector of delay times (ms). */
+    obfunc ranDel() {local delay, i, x  localobj delays
+        delay = $1
+        delays = new Vector($2)
+        if ((pProc && $o3.id == 0) || !pProc) {
+            if ($4) {
+                {r.Random123(randomInstance,0)}
+                r.normal(0,1)
+                for i = 0,delays.size()-1 {
+                    x = normRepick(r)
+                    delays.x[i] = testDel(delay + 0.2*delay*x, delay)
+                }
+                randomInstance += 1
+            } else {
+                for i = 0,delays.size()-1 {
+                    delays.x[i] = testDel(delay, delay)
+                }
+            }
+        }
+        if (pProc) {
+            {$o3.barrier()}
+            $o3.broadcast(delays, 0)
+            {$o3.barrier()}
+        }
+        return delays
+    }
+
+
+
+/*  A routine for testing and adjusting a synaptic weight. Input:
+    $1 - a chosen weight.
+    Output: a correct weight. */
+    func testWei() {local weight
+        weight = $1
+        if (weight <= 0) {
+            weight = 1e-10
+        }
+        return weight
+    }
+
+
+
+/*  A routine for producing a vector of synaptic weights. Inputs:
+    $1  - average weight;
+    $2  - number of connections;
+    $o3 - prallel context object (see NEURON's documentation);
+    $4  - randomise weights: 1 - yes, 0 - no.
+    Output is a vector of synaptic weights. */
+    obfunc ranWei() {local i, x  localobj weights
+        weight = $1
+        weights = new Vector($2)
+        if ((pProc && $o3.id == 0) || !pProc) {
+            if ($4) {
+                {r.Random123(randomInstance,0)}
+                r.normal(0,1)
+                for i = 0,weights.size()-1 {
+                    x = normRepick(r)
+                    weights.x[i] = testWei((1 + 0.05*x)*weight)
+                }
+                randomInstance += 1
+            } else {
+                for i = 0,weights.size()-1 {
+                    weights.x[i] = testWei(weight)
+                }
+            }
+        }
+        if (pProc) {
+            {$o3.barrier()}
+            $o3.broadcast(weights, 0)
+            {$o3.barrier()}
+        }
+        return weights
+    }
+
+
+
+/*  The Procedure 'createSyns' creates certain type of synapses for all
+    cells participating in a certain type of connectivity.
+    The calling syntax is createSyns($o1, $o2, $s3, $o4), where
+    $o1 - the list of postsynaptic cell objects;
+    $o2 - a vector of corresponding postsynaptic gids;
+    $s3 - the type of synapses: "AMPA", "NMDA", "NMDA2", "GABAa", "GABAb",
+          "GLU", "GABA";
+    $4  - release probability;
+    $o5 - ISO amplitude vector. If the object is NULL, the amplitude is set to 0;
+    $o6 - the parallel context object (see NEURON documentation). */
+    proc createSyns() {local i  localobj gids, cell
+        gids = $o2
+        for i = 0, gids.size()-1 {   // steps through the postsynaptic cells
+            if (!pProc || (pProc && $o6.gid_exists(gids.x[i], $o6.id))) {
+                if (pProc) {
+                    cell = $o6.gid2cell(gids.x[i])
+                } else {
+                    cell = $o1.o(i)
+                }
+                if (object_id($o5,1) != -1) {
+                    cell.createSyn($s3, $4, $o5.x[i])
+                } else {
+                    cell.createSyn($s3, $4, 0)
+                }
+            }
+        }
+    }
+
+
+
+/*  Object function 'connectSyns' connects cell synapses and appends the
+    netcons to a list called ncSynlist. ncSynlist orders netcons based on
+    their targets. The netcons corresponding to the minis object inputs are
+    stored in ncMinlist. The calling syntax is
+    connectSyns($o1, $o2, $o3, $o4, $5, $6, $o7, $o8, $9, $o10, $11, $12, $13, $o14, $15), where
+    $o1  - the list of source cell objects;
+    $o2  - a vector with source gids;
+    $o3  - the list of target cell objects;
+    $o4  - a vector with target gids;
+    $5   - the connectivity ratio (probability of two random cells being
+           connected);
+    $s6  - the type of synapses: "AMPA", "GLU", "GLUfull", "GABAa", "GABA";
+    $o7  - connection delay vector matching the total number of particular type connections;
+    $o8  - connection weight vector matching the total number of particular type connections;
+    $9   - a scalar for a central connection:
+           0 - no (to prevent autapses), 1 - yes;
+    $o10 - the parallel context object (see NEURON documentation);
+    $11  - add spontaneous PSPs (minis): 1 - yes, 0 - no;
+    $12  - the number of synapses formed in a single connection;
+    $13  - the synaptic release probability;
+    $o14 - ISO amplitude vector. If the object is NULL, the amplitude is set to 0;
+    $15  - network edge: 1 - yes, 0 - no.
+    Output is a list composed of two lists: the first list of synaptic netcons
+    and the second one of minis netcons. */
+    obfunc connectSyns() {local ratio, converge, central, count, i, trgGid, j, srcInd, srcGid, k, delay, \
+                                   weight, amp, ncCount, jCount, l, thr\
+                          localobj synList, srcCells, srcGids, trgCells, trgGids, ncSynlist, ncMinlist, \
+                                   nclist, src, trg, syn, ncSyn, mini, ncMin
+        srcCells = $o1
+        srcGids = $o2
+        trgCells = $o3
+        trgGids = $o4
+        ratio = $5
+        converge = srcGids.size()*ratio
+        srcStep = srcGids.size()/trgGids.size()
+        central = $9
+        ncSynlist = new List()
+        ncMinlist = new List()
+        nclist = new List()
+        count = 0
+        thr = -14.5 //(mV)
+        for i = 0, trgGids.size()-1 {  // iterating over targets
+        	trgGid = trgGids.x[i]
+            if (pProc && !($o10.gid_exists(trgGid, $o10.id))) {
+                continue
+            }
+            ncCount = 0
+            jCount = 0
+            for j = 0, int((i+1)*converge)-int(i*converge)-1 {  // iterating over sources
+                srcInd = (int(i*srcStep)-int(converge/2)+j)
+                if ($15 && (srcInd < 0 || srcInd >= srcGids.size())) {
+                    continue
+                } else {
+                    srcInd = srcInd%srcGids.size()
+                }
+                if (!(!central && srcInd == i)) {
+                    srcGid = srcGids.x[srcInd]
+                    for k = 0, $12-1 {
+                        delay = $o7.x[count]
+                        weight = $o8.x[count]
+                        if (object_id($o14,1) != -1) {
+                            amp = $o14.x[count]
+                        } else {
+                            amp = 0
+                        }
+                        //print "trgInd=", i, "srcInd=", srcInd, "order=", count
+                        if (pProc) {
+                            trg = $o10.gid2cell(trgGid)
+                            if (!strcmp($s6, "GABA") || !strcmp($s6, "GABAfull") || !strcmp($s6, "GLUfull")) {
+                                trg.createSyn($s6, $13, amp)
+                            }
+                            syn = trg.getSyn($s6)
+                            ncSyn = $o10.gid_connect(srcGid, syn)
+                            ncSyn.threshold = thr
+                            ncSyn.delay = delay
+                            ncSyn.weight = weight
+                            if (!strcmp($s6, "GABA")) {
+                                syn.weight_b = weight
+                            } else if (!strcmp($s6, "GABAfull")) {
+                                syn.weight_c = weight
+                            } else if (!strcmp($s6, "GLUfull")) {
+                                syn.gbar_c = syn.gbar_c/$12
+                                syn.gbase_c = syn.gbase_c/$12
+                                syn.weight_c = weight/$12
+                            }
+                            //print "Synapse: source ","- ","id ",srcGid," to target ",trg,"id ",trgGid," via ",syn
+                            if ($11) {
+                                mini = trg.getMini($s6)
+                                ncMin = $o10.gid_connect(srcGid, mini)
+                                ncMin.threshold = thr
+                                ncMin.delay = delay - 0.6
+                                ncMin.weight = 1
+                                ncMinlist.append(ncMin)
+                            }
+                        } else {
+                            src = srcCells.o(srcInd)
+                            trg = trgCells.o(i)
+                            if (!strcmp($s6, "GABA") || !strcmp($s6, "GABAfull") || !strcmp($s6, "GLUfull")) {
+                                trg.createSyn($s6, $13, amp)
+                            }
+                            syn = trg.getSyn($s6)
+                            ncSyn = src.connect2target(syn, delay, weight)
+                            if (!strcmp($s6, "GABA")) {
+                                syn.weight_b = weight
+                            } else if (!strcmp($s6, "GABAfull")) {
+                                syn.weight_c = weight
+                            } else if (!strcmp($s6, "GLUfull")) {
+                                syn.gbar_c = syn.gbar_c/$12
+                                syn.gbase_c = syn.gbase_c/$12
+                                syn.weight_c = weight/$12
+                            }
+                            //print "Synapse: source ",src,"id ",srcGid," to target ",trg,"id ",trgGid," via ",syn
+                            if ($11) {
+                                mini = trg.getMini($s6)
+                                ncMin = src.connect2target(mini, delay - 0.6, 1)
+                                ncMinlist.append(ncMin)
+                            }
+                        }
+                        ncSynlist.append(ncSyn)
+                        ncCount += 1
+                        count += 1
+                    }
+                    jCount += 1
+                }
+            }
+            if ($15) {
+                if (!strcmp($s6, "GLUfull")) {
+                    synList = trg.getSynList("GLUfull")
+                    for l = 0, synList.count()-1 {
+                        synList.o(l).gbar_c = synList.o(l).gbar_c/(synList.count()/(converge*$12))
+                        synList.o(l).gbase_c = synList.o(l).gbase_c/(synList.count()/(converge*$12))
+                    }
+                } else if (!strcmp($s6, "GABA")) {
+                    synList = trg.getSynList("GABA")
+                    for l = 0, synList.count()-1 {
+                        synList.o(l).weight_b = synList.o(l).weight_b/(synList.count()/(converge*$12))
+                    }
+                } else if (!strcmp($s6, "GABAfull")) {
+                    synList = trg.getSynList("GABAfull")
+                    for l = 0, synList.count()-1 {
+                        synList.o(l).gbar_c = synList.o(l).gbar_c/(synList.count()/(converge*$12))
+                    }
+                }
+                for l = 1, ncCount {
+                    ncSynlist.o(ncSynlist.count()-l).weight = ncSynlist.o(ncSynlist.count()-l).weight/(jCount/converge)
+                }
+            }
+        }
+        nclist.append(ncSynlist)
+        if ($11) {
+            nclist.append(ncMinlist)
+        }
+        return nclist
+    }
+
+
+
+/*  Object function 'connectMinis' connects cell synapses with their
+    corresponding minis objects and appends the NetCons to a List called
+    nclist. The calling syntax is connectMins($o1, $2, $3, $4), where
+    $o1 - the list of cell objects;
+    $2  - connection delay;
+    $3  - connection weight;
+    $s4 - the type of synapses: "AMPA", "GLU", or "GABAa".
+    Output is a list of NetCons. */
+    obfunc connectMinis() {local i  localobj nc, nclist
+        nclist = new List()
+        for i = 0, $o1.count()-1 {   // iterating over targets
+            nc = $o1.o(i).connectMini($s4, $2, $3)
+            nclist.append(nc)
+        }
+        return nclist
+    }
+
+
+
+/*  Object function createGaps() creates two-way gap junctions between two
+    cells and returns the list with gap junction objects.
+    Inputs:
+    $1  - resistance of the gap junction (MOhms);
+    $o2 - the list of the cell objects to be connected by gap junctions;
+    $o3 - the vector of corresponding gids;
+    $o4 - the vector of all gids to be connected;
+    $o5 - the parallel context object (see NEURON documentation);
+    $6  - network edge: 1 - yes, 0 - no;
+    $7  - non-interference step (to avoid mixing-up FO and HO populations). */
+    obfunc createGaps() {local ngids, i, j, r, gid, sgid, tgid  localobj gapj, gaps
+        gaps = new List()
+        ngids = $o4.size()
+        if (ngids > 1) {
+            r = $1
+            if (pProc) {
+                for i = 0, $o2.count()-1 $o2.o(i).soma {
+                    gid = $o3.x[i] - $o4.min()
+                    for (j = -2; j <= 2; j += 1) {
+                        sgid = (gid + j)
+                        if (!j || ($6 && (sgid < 0 || sgid >= ngids))) {
+                            continue
+                        } else {
+                            gapj = new HalfGap(.5)
+                            if (j == -1 || j == 1) {
+                                gapj.r = r
+                            } else {
+                                gapj.r = 2*r
+                                //gapj.r = r
+                            }
+                            gaps.append(gapj)
+                            $o2.o(i).appendGapList(gapj)
+                            sgid = sgid%ngids
+                            $o5.target_var(gapj, &gapj.vgap, sgid+$7) // integer on other instances associated
+                                                                      // with a source variable by source_var
+                                                                      // gets projected to a gap junction.
+                            //print pc.id, i, $o2.count(), $o2.o(i),   ngids, gid, $o2.o(i).gid, sgid+$7
+                            if ($o4.size() == 2) {
+                                break
+                            }
+                        }
+                    }
+                    tgid = gid
+                    $o5.source_var(&v(.5), tgid+$7)     // associate $o2.o(i).soma.v(.5) with an integer;
+                                                        // has nothing to do with gids; is used by target_var
+                                                        // to recognise source variables on other instances.
+                }
+            } else {
+                for i = 0, ngids-1 {
+                    if (ngids > 2 && $6 && i == ngids-1) {
+                        continue
+                    } else {
+                        $o2.o(i).soma {
+                            gapj = new gap(.5)
+                            gapj.r = r
+                            sgid = (i + 1)%ngids
+                            setpointer gapj.vgap, $o2.o(sgid).soma.v(0.5)
+                            gaps.append(gapj)
+                            $o2.o(i).appendGapList(gapj)
+                        }
+                        if (ngids > 2) {
+                            $o2.o((i + 1)%ngids).soma {
+                                gapj = new gap(.5)
+                                gapj.r = r
+                                sgid = i
+                                setpointer gapj.vgap, $o2.o(sgid).soma.v(0.5)
+                                gaps.append(gapj)
+                                $o2.o((i + 1)%ngids).appendGapList(gapj)
+                            }
+                            $o2.o((i + 2)%ngids).soma {
+                                gapj = new gap(.5)
+                                gapj.r = 2*r
+                                //gapj.r = r
+                                sgid = i
+                                setpointer gapj.vgap, $o2.o(sgid).soma.v(0.5)
+                                gaps.append(gapj)
+                                $o2.o((i + 2)%ngids).appendGapList(gapj)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return gaps
+    }
+
+
+
+/*  An object function for connecting two populations of cells residing on
+    separate structures. Inputs:
+    $1   - the connectivity ratio (probability of two random cells being
+          connected);
+    $2   - delay;
+    $3   - weight;
+    $o4  - the list of source cell objects;
+    $o5  - a vector with source gids;
+    $o6  - the list of target cell objects;
+    $o7  - a vector with target gids;
+    $8   - synaptic spread factor;
+    $9   - release probability;
+    $o10 - ISO amplitude vector. If the object is NULL, the amplitude is set to 0;
+    $11  - Network edge: 1 - yes, 0 - no;
+    $s12 - Synapse type.
+    The output object is a list of netcon objects representing synaptic
+    connections. */
+    obfunc connect2pops() {local ratio, nConns \
+                           localobj srcCells, srcGids, trgCells, trgGids, delayVec, weightVec, ncList
+        ratio = $1
+        srcCells = $o4
+        srcGids = $o5
+        trgCells = $o6
+        trgGids = $o7
+        nConns = round(ratio*srcGids.size()*trgGids.size()*$8)
+        delayVec = ranDel($2, nConns, pc, randomise.x[2])
+        weightVec = ranWei($3, nConns, pc, randomise.x[3])
+        ncList = connectSyns(srcCells, srcGids, trgCells, trgGids, ratio, \
+                             $s12, delayVec, weightVec, 1, pc, randomise.x[4], $8, $9, $o10, $11)
+        return ncList
+    }

@@ -1,0 +1,811 @@
+/*----------------------------------------------------------------------------
+
+	THALAMOCORTICAL (TC) RELAY CELL
+	=================================
+
+	Simulations of a single-compartment model of thalamic relay cell.
+
+	The geometric and passive parameters of the model are set to give the
+    capacitance of the cell <200 pF and twice the size of the NRT single
+    cell model. The conductances of sodium (I_Naleak) and potasium leak
+    current (I_Kleak) should be adjusted in order to obtain a range of
+    input resistances that support various oscillations. The apparent input
+    resistance is ~160 MOhms and the resting membrane potential is ~-65 mV.
+    These estimates are average values based on multiple studies carried
+    out in Crunelli's lab in cats and rats. Mind though that these values
+    vary largely depending  on the age of an animal (for ref. see [1]).
+
+    The cell is adapted to be used in parallel network simulations if
+    necessary.
+    
+    The following active currents are included in the model (the references
+    describing the models are provided in the descriptions of model (.mod)
+    files:
+        - HH mechanism: fast Na+ I_Na and K+ delayed rectifier I_K(DR)
+            currents. Required for action potential generation.
+        - I_T: low voltage-activated Ca2+ T-type current. Required for low-
+            threshold calcium spikes, rebound bursting, and a number of
+            oscillations including delta and slow (<1 Hz).
+        - I_AHP: or I_K[Ca] is a Ca2+-activated K+ current. Significant
+            only in higher order thalamic relay cells.
+        - I_h anaomalous rectifier current (hyperpolarisation-activated
+            non-specific cation current) - an essential pacemaking current
+            working in cooperation with I_T. Adding I_h Ca2+-dependence
+            results in waxing-and-waning property of oscillations.
+        - I_CAN: slow Ca2+ dependent non-specific cation current. This
+            current is required for expanding the range of intrinsic slow
+            (<1 Hz) oscillation and smoothing the up-state.
+        - I_Na(P): persistent low voltage-activated Na+ current; provides
+            input amplification and increase in the input resistence
+            contributing to the intrinsic slow oscillation.
+        - I_A: fast transient voltage activated K+ current.
+        - I_K1: another significant voltage activated K+ current.
+        - I_K2: another significant voltage activated K+ current.
+        - I_HVA: high threshold Ca2+ current. At least 4 distinct types of
+            channels of this kind in TC cells. Involved in high-threshold
+            bursts.
+        - I_AMPA
+        - I_NMDA
+        - I_GABAa
+        - I_GABAb
+
+    References:
+    [1] Lee, S.-C., Cruikshank, S.J., and Connors, B.W. Electrical and
+        chemical synapses between relay neurons in developing thalamus.
+        Journal of Physiology, 588: 2403-2415, 2010.
+
+    Written by Martynas Dervinis @Cardiff University, 2013.
+
+    *notes:
+    *1  - given enarev = 60, ekrev = -90, diam = 60, L = 90,
+          g_pas = 0.0000470, e_pas = ekrev, cm = 0.88, Ra = 150,
+          g_naleak = 0.0000091, e_naleak = 10, depth_cad = 17,
+          taux_cad = 133, cainf_cad = 50e-6, enaHH_hhT = 30, ek = ekrev,
+          vtraubNa_hhT = -42, vtraubK_hhT = -38, gnabar_hhT = 0.07,
+          gkbar_hhT = 0.07, pcabar_itGHK = 8.8e-5, eh = -40,
+          ghbar_iarg = 0.00012, shift_iarg = -18, ginc_iarg = 2,
+          cainf_iarg = 50e-6, cac_iarg = 0.000450, k2_iarg = 0.000150,
+          Pc_iarg = 0.017, k4_iarg = 0.00007, nca_iarg = 4, nexp_iarg = 1,
+          gkbar1_iahp = 0, gkbar2_iahp = 0, tau_m1_min_iahp = 90,
+          tau_m2_min_iahp = 830, en = 10, gnbar_ican = 0.000072,
+          k1_ican = 1e11, k2_ican = 0.01, k3_ican = 0.0015,
+          k4_ican = 0.0007, gnabar_inap = 0.00001612, shift_inap = 0,
+          gbar1_ia = 0.000242, gbar2_ia = gbar1_ia*0.663,
+          gbar_ik1 = 0.000014, gbar_ik2 = 0, pcabar_ihvaTC = 0.00001,
+          nseg = 1
+          >> Vrest = -65.06, Ri = 160.77 MOhm with stim.amp = -0.02 nA
+                             Ri = 158.56 MOhm with stim.amp = -0.05 nA
+    *2  - g_pas = 0.0000512, g_naleak = 0.0000091, pcabar_itGHK = 1.8*8.8e-5,
+          gkbar1_iahp = 0.000001, gnbar_ican = 0.15*0.000072
+          >> Vrest = -65.04, Ri = 129.78 MOhm with stim.amp = -0.02 nA
+                             Ri = 135.55 MOhm with stim.amp = -0.05 nA
+    *3  - given enarev = 60, ekrev = -90, diam = 60, L = 90,
+          g_pas = 0.00004, e_pas = ekrev, cm = 0.88, Ra = 150,
+          g_naleak = 0.0000033, e_naleak = 10, depth_cad = 17,
+          taux_cad = 133, cainf_cad = 50e-6, enaHH_hhT = 30, ek = ekrev,
+          vtraubNa_hhT = -40, vtraubK_hhT = -40, gnabar_hhT = 0.07,
+          gkbar_hhT = 0.07, pcabar_itGHK = 8.8e-5, eh = -40,
+          ghbar_iarg = 0.00012, shift_iarg = -18, ginc_iarg = 2,
+          cainf_iarg = 50e-6, cac_iarg = 450, k2_iarg = 0.000150,
+          Pc_iarg = 0.017, k4_iarg = 0.00007, nca_iarg = 4, nexp_iarg = 1,
+          gkbar1_iahp = 0, gkbar2_iahp = 0, tau_m1_min_iahp = 90,
+          tau_m2_min_iahp = 830, cac_icanm = 0.00045, beta_icanm = 0.0001,
+          taumin_icanm = 0.1, en = 0, gbar_icanm = 0.0001,
+          gnabar_inap = 0.00002015, shift_inap = 0, gbar1_ia = 0.000242,
+          gbar2_ia = gbar1_ia*0.663, gbar_ik1 = 0.000014,
+          gbar_ik2 = 0.0002, pcabar_ihvaTC = 0.000135, nseg = 1
+          >> Vrest = -65.06, Ri = 165.7 MOhm with stim.amp = -0.02 nA
+                             Ri = 134.16 MOhm with stim.amp = -0.05 nA
+          >> @ -75 mV,       Ri = 43.69 MOhm with stim.amp = -0.02 nA
+
+----------------------------------------------------------------------------*/
+
+
+
+begintemplate TCcell
+public soma, gid, devRi, enarev, ekrev, input, is_art
+public createSyn, getSyn, getSynList, connect2target
+public createMini, getMini, connectMini, inserted, rcount, rlist
+external varDt, randomise, globalIndex, min, lambda_f, state
+
+objref AMPAsyn, GLUsyn, GLUfullsyn, GABAAsyn, GABAsyn, GABAfullsyn
+objref AMPAsynList, GLUsynList, GLUfullsynList, GABAAsynList, GABAsynList, GABAfullsynList, synList
+objref AMPAmini, GABAAmini, minisList, rlist, input, inserted
+strdef section
+
+create soma
+
+proc init() {
+    gid = $1
+    devRi = $2
+    section = $s3
+    insertNil = 1
+    insertExC = 1
+    insertHH = 1
+    insertIT = 1
+    insertIAHP = 1
+    insertIh = 1
+    insertICAN = 1
+    insertINaP = 1
+    insertIA = 1
+    insertIK1 = 1
+    insertIK2 = 1
+    insertIHVA = 1
+    inserted = new Vector(13)
+    AMPAsynList = new List()
+    GLUsynList = new List()
+    GLUfullsynList = new List()
+    GABAAsynList = new List()
+    GABAsynList = new List()
+    GABAfullsynList = new List()
+    synList = new List()
+    minisList = new List()
+    rlist = new List()
+    input = new List()
+    input.append(synList)
+    input.append(minisList)
+    rcount = 0
+
+    enarev = 60
+    ekrev = -90
+    GABAarev = -70
+
+    soma {
+        diam = 60
+        L = 90
+    }
+
+    if (insertNil) {
+    	forall {
+            insert pas                                                      // Passive properties and K+ leak current
+            inserted.x[0] = 1
+            g_pas = 0 //0.00004
+            e_pas = ekrev
+            cm = 0.88
+            Ra = 150
+
+            insert naleak                                                   // Na+ leak current
+            inserted.x[1] = 1
+            if (!strcmp(state,"SWDs_short") || !strcmp(state,"SWDs_long") || !strcmp(state,"wake_short") || !strcmp(state,"wake_long")) {
+                if (!strcmp(section, "FO")) {
+                    g_naleak = 0.000052
+                } else {
+                    g_naleak = 0.00003
+                }
+            } else {
+                g_naleak = 0
+            }
+            e_naleak = 10
+
+            insert cad                                                      // Intracellular [Ca2+] decay
+            inserted.x[2] = 1
+            depth_cad = 17
+            taux_cad = 133
+            cainf_cad = 50e-6
+
+            insert cadhva                                                   // Intracellular [Ca2+] decay
+            depth_cadhva = 17
+            taux_cadhva = 133
+            cainf_cadhva = 0e-6
+        }
+    }
+
+    if (insertExC && !varDt) {
+        forall {
+            insert extracellular                                            // Extracellular fields for monitoring total membrane current
+            inserted.x[3] = 1
+        }
+    }
+
+    if (insertHH) {
+        soma {                                                              // HH mechanism
+            insert hhT
+            inserted.x[4] = 1
+            enaHH_hhT = 30
+            ek = ekrev
+            vtraubNa_hhT = -40                                              // the action potential threshold of the HH mechanism: -65.5
+            vtraubK_hhT = -40
+            gnabar_hhT = 0.07                                               // 0.000823 @ vtraub = -45: 2.313 nA, 0.000564 @ vtraub = -70: 2.315 (max: 2.314 nA)
+            gkbar_hhT = 0.07                                                // possible working sets: -45 0.045 0.022; -38 0.04 0.017; 30 -42 -38: 0.07 0.07
+        }
+    }
+
+    if (insertIT) {
+        forall {
+            // VB:
+            /* insert itGHK                                                    // LVA I_T[Ca] with GHK equations
+            inserted.x[5] = 1
+            if (!strcmp(section, "FO")) {
+                pcabar_itGHK = 8.8e-5                                       // 1.8-8.8: 2-10nA; 10e-5: 11.39nA; 11e-5: 12.53nA;
+            } else if (!strcmp(section, "HO")) {
+                pcabar_itGHK = 1.5*8.8e-5 //[1.1 1.8]*8.8e-5
+            }
+            mshift_itGHK = 0
+            hshift_itGHK = 0
+            tau_m_min_itGHK = 0
+            tau_h_min_itGHK = 0
+            adj_itGHK = 0
+            km_itGHK = 6.2
+            kh_itGHK = 4 */
+            // LGN:
+            insert it
+            inserted.x[5] = 1
+            if (!strcmp(section, "FO")) {
+                gcabar_it = 0.0021                                          // 0.0004-0.0021: 2-10nA; max 0.00144, if adj = 1; max 0.000985, if adj = 1, m_shift_it = 3, h_shift_it = 3
+            } else if (!strcmp(section, "HO")) {
+                gcabar_it = 2*0.0021
+            }
+            adj_it = 1
+            tau_m_min_it = 0
+            if (!strcmp(state,"delta_short") || !strcmp(state,"delta_long")) {
+                tau_h_min_it = 0
+            } else {
+                if (!strcmp(section, "FO")) {
+                    tau_h_min_it = 0
+                } else if (!strcmp(section, "HO")) {
+                    tau_h_min_it = 0
+                }
+            }
+            m_shift_it = 3
+            h_shift_it = 3
+        }
+    }
+
+    if (insertIh) {
+        forall {
+            /*insert iarreg                                                   // I_h (Na+/K+) current
+            inserted.x[6] = 1
+            eh = -40                                                        // reversal potential
+            ghbar_iarreg = 0.00012                                          // Max: 0.00061 (2.6 nA), 0.00047 (2 nA), 0.00012 (0.5 nA), Min: 0.000055 (0.233 nA); 0.000012 (0.051 nA).
+            shift_iarreg = -18 */
+
+            insert iarg
+            inserted.x[6] = 1
+            eh            = -40
+            if (!strcmp(section, "FO")) {
+                ghbar_iarg = 0.00011
+                if (!strcmp(state,"none")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"delta_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"delta_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"slow_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"slow_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"spindles_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"spindles_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"SWDs_short")) {
+                    shift_iarg = 0                                          // SWDs: -28; else: 0. Min: -28
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"SWDs_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850                                   // Min: 0.001400. IT-mediated Ca2+ influxes associated with SWCs are in the range of ~600-700 uM
+                } else if (!strcmp(state,"wake_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"wake_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                }
+                nca_iarg   = 8
+                ginc_iarg  = 0.5
+            } else if (!strcmp(section, "HO")) {
+                ghbar_iarg = 0.00011
+                if (!strcmp(state,"none")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"delta_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"delta_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"slow_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"slow_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"spindles_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"spindles_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"SWDs_short")) {
+                    shift_iarg = 0                                          // SWDs: -10; else: 0. Min: -28
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"SWDs_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850                                   // Min: 0.001400. IT-mediated Ca2+ influxes associated with SWCs are in the range of ~650-780 uM
+                } else if (!strcmp(state,"wake_short")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                } else if (!strcmp(state,"wake_long")) {
+                    shift_iarg = 0
+                    cac_iarg   = 0.000850
+                }
+                nca_iarg   = 8
+                ginc_iarg  = 0.5
+            }
+            k2_iarg       = 0.000150
+            Pc_iarg       = 0.017
+            k4_iarg       = 0.00007
+            nexp_iarg	  = 1
+            tau_min_iarg  = 20
+        }
+    }
+
+    if (insertICAN) {
+        forall {
+            /* insert ican                                                     // Nonspecific cation current I_CAN
+            inserted.x[7] = 1
+            en = 10
+            if (!strcmp(section, "FO")) {
+                gnbar_ican = 0.000005                                       // (hh, itGHK, iar): 0.00011, 1e11, 0.01, 0.0015, 0.0007
+            } else if (!strcmp(section, "HO")) {                            // fast: gnbar_ican = 0.000016, 1e11, 0.01, 0.25, 0.0123
+                gnbar_ican = 0.000005                                       // Hughes et al. (2002) used parameters of 1.25e7, 2e4, 0.075, 0.00075
+            }
+            k1_ican = 1e11
+            k2_ican = 0.01
+            k3_ican = 0.0015
+            k4_ican = 0.0007 */
+
+            /* insert icand 		// nonspecific cation current ICAN
+            beta_icand = 0.0001
+            taumin_icand = 0.1
+            en = 0
+            gbar_icand = 0.0003
+            cac_icand = 0.0009 //0.00045 */
+            
+            insert icanmTC 		// nonspecific cation current ICAN
+            cac_icanmTC = 0.00045
+            beta_icanmTC = 0.0001
+            taumin_icanmTC = 0.1
+            inact_icanmTC = 1
+            tau_hCa_min_icanmTC = 0.1
+            en = 0
+            if (!strcmp(section, "FO")) {
+                gbar_icanmTC = 0.75*0.0001
+            } else if (!strcmp(section, "HO")) {
+                gbar_icanmTC = 0.75*0.0001
+            }
+        }
+    }
+
+    if (insertINaP) {
+        soma {                                                              // I_Na(P) Na+ low threshold persistent current
+            insert inap
+            inserted.x[8] = 1
+            gnabar_inap = 0.00002015
+            shift_inap = 0                                                  // ranges from -3 to 3
+        }
+    }
+
+    if (insertIA) {
+        forall {
+            insert ia                                                       // I_A
+            inserted.x[9] = 1
+            gbar1_ia = 0.000242                                             // 0.000242: ~7.6 nA (max)
+            gbar2_ia = gbar1_ia*0.663
+        }
+    }
+
+    if (insertIK1) {
+        forall {
+            insert ik1                                                      // I_K1
+            inserted.x[10] = 1
+            gbar_ik1 = 0.000014                                             // 0.000014: 307.2 pA (max: 326.8 pA)
+        }
+    }
+
+    if (insertIK2) {
+        forall {
+            insert ik2                                                      // I_K2
+            inserted.x[11] = 1
+            gbar_ik2 = 0.0002                                               // 0.0001: 2.102 nA. 0.0002: 3.93 nA. Max: 4.248 nA
+        }
+    }
+
+    if (insertIHVA) {
+        forall {
+            insert ihvaTC                                                   // I_HVA[Ca]
+            inserted.x[12] = 1
+            pcabar_ihvaTC = 0.000135                                        // 0.000135: 4.353 nA (max: 4.38 nA); 0.000062: 2 nA (1.627 nA when shift = 15)
+            adj_ihvaTC = 1
+        }
+    }
+
+    //forall nseg = int((L/(0.1*lambda_f(100))+0.9)/2)*2 + 1                  // Lambda rule
+    forall nseg = 1
+}
+
+obfunc connect2target() {localobj nc //$o1 - target process, $2 - connection delay, $3 - connection weight
+    soma nc = new NetCon(&v(0.5), $o1)
+    nc.threshold = -14.5
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+obfunc connectMini() {localobj nc //$s1 - type of synapse, $2 - connection delay, $3 - connection weight
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLUfull")) {
+        nc = new NetCon(AMPAmini, AMPAsyn)
+    } else if (!strcmp($s1,"GLU")) {
+        nc = new NetCon(AMPAmini, GLUsyn)
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA")) {
+        nc = new NetCon(GABAAmini, GABAAsyn)
+    }
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+proc createAMPAsyn() {localobj r // $1 - release probability
+    soma AMPAsyn = new AMPA_S(0.5)
+    AMPAsyn.gbar = 0.04
+    AMPAsyn.Alpha = 10
+    AMPAsyn.Beta = 3
+    AMPAsyn.Cmax = 0.5
+    AMPAsyn.Cdur = 0.3
+    AMPAsyn.Erev = 0
+    if (randomise.x[5]) {
+        AMPAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        AMPAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    AMPAsynList.append(AMPAsyn)
+    synList.append(AMPAsyn)
+}
+
+proc createGLUsyn() {localobj r // $1 - release probability
+    soma GLUsyn = new GLU_S2(0.5)
+    GLUsyn.gbar_a = 0.034           // 0.4mV, 0.7ms, 26.2ms: 0.04, 10, 3, 0.5, 0.3, 0, 0.85, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0.85
+    GLUsyn.Alpha_a = 10
+    GLUsyn.Beta_a = 3
+    GLUsyn.Cmax_a = 0.5
+    GLUsyn.Cdur_a = 0.3
+    GLUsyn.Erev_a = 0
+    GLUsyn.weight_a = 1
+    GLUsyn.d1 = 1
+    GLUsyn.tau_D1 = 1200
+	GLUsyn.tau1_init_b = 3
+	GLUsyn.a2_b = 2.2364
+	GLUsyn.tau2_0_b = 25.057
+	GLUsyn.a3_b = 43.495
+	GLUsyn.tau3_0_b = 232.27
+    GLUsyn.tauAdj_b = 1
+    GLUsyn.gf_b = 0.0003
+    GLUsyn.Mg_b = 0.5
+    GLUsyn.weight_b = 1
+    if (randomise.x[5]) {
+        GLUsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GLUsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GLUsynList.append(GLUsyn)
+    synList.append(GLUsyn)
+}
+
+proc createGLUfullsyn() {localobj r // $1 - release probability
+    soma GLUfullsyn = new GLU_S3(0.5)
+    GLUfullsyn.gbar_a = 0.034           // 0.4mV, 0.7ms, 26.2ms: 0.034, 10, 3, 0.5, 0.3, 0, 1, 0.2, 2500, 3, 2.2364, 25.057, 43.495, 232.27, 1, 0.0003, 0.5, 0.85
+    GLUfullsyn.Alpha_a = 10
+    GLUfullsyn.Beta_a = 3
+    GLUfullsyn.Cmax_a = 0.5
+    GLUfullsyn.Cdur_a = 0.3
+    GLUfullsyn.Erev_a = 0
+    GLUfullsyn.weight_a = 1
+	GLUfullsyn.tau1_init_b = 3
+	GLUfullsyn.a2_b = 2.2364
+	GLUfullsyn.tau2_0_b = 25.057
+	GLUfullsyn.a3_b = 43.495
+	GLUfullsyn.tau3_0_b = 232.27
+    GLUfullsyn.tauAdj_b = 1
+    GLUfullsyn.gf_b = 0.0003
+    GLUfullsyn.Mg_b = 0.5
+    GLUfullsyn.weight_b = 0.1 //1
+    if (!strcmp(section, "FO")) {
+        if (!strcmp(state,"none")) {
+            GLUfullsyn.gbase_c = 0.0023
+        } else if (!strcmp(state,"delta_short")) {
+            GLUfullsyn.gbase_c = 0.0019                                     //Delta: 0.0019; Slow: 0.0015; Spindles:0.0009; SWDs:0.0014; Wake:0.00133-0.0013
+        } else if (!strcmp(state,"delta_long")) {
+            GLUfullsyn.gbase_c = 0.0019
+        } else if (!strcmp(state,"slow_short")) {
+            GLUfullsyn.gbase_c = 0.0015
+        } else if (!strcmp(state,"slow_long")) {
+            GLUfullsyn.gbase_c = 0.0015
+        } else if (!strcmp(state,"spindles_short")) {
+            GLUfullsyn.gbase_c = 0.0008
+        } else if (!strcmp(state,"spindles_long")) {
+            GLUfullsyn.gbase_c = 0.0008
+        } else if (!strcmp(state,"SWDs_short")) {
+            GLUfullsyn.gbase_c = 0.001395                                    // > 0.0013792
+        } else if (!strcmp(state,"SWDs_long")) {
+            GLUfullsyn.gbase_c = 0.001395
+        } else if (!strcmp(state,"wake_short")) {
+            GLUfullsyn.gbase_c = 0.001325
+        } else if (!strcmp(state,"wake_long")) {
+            GLUfullsyn.gbase_c = 0.001325
+        }
+        GLUfullsyn.gbase_c = GLUfullsyn.gbase_c + 0.000001*devRi
+        GLUfullsyn.gbar_c = min(0.0017, (GLUfullsyn.gbase_c/0.0012)*0.0017)
+    } else if (!strcmp(section, "HO")) {
+        if (!strcmp(state,"none")) {
+            GLUfullsyn.gbase_c = 0.00305
+        } else if (!strcmp(state,"delta_short")) {
+            GLUfullsyn.gbase_c = 0.00305                                    //Delta: 0.00305; Slow: 0.0022; Spindles:0.002-0.0021; SWDs:0.0044; Wake:0.0044
+        } else if (!strcmp(state,"delta_long")) {
+            GLUfullsyn.gbase_c = 0.00305
+        } else if (!strcmp(state,"slow_short")) {
+            GLUfullsyn.gbase_c = 0.0022
+        } else if (!strcmp(state,"slow_long")) {
+            GLUfullsyn.gbase_c = 0.0022
+        } else if (!strcmp(state,"spindles_short")) {
+            GLUfullsyn.gbase_c = 0.0021
+        } else if (!strcmp(state,"spindles_long")) {
+            GLUfullsyn.gbase_c = 0.0021
+        } else if (!strcmp(state,"SWDs_short")) {
+            GLUfullsyn.gbase_c = 0.0045                                     //4Hz: 0.0046; 7Hz: 0.0028
+        } else if (!strcmp(state,"SWDs_long")) {
+            GLUfullsyn.gbase_c = 0.0045
+        } else if (!strcmp(state,"wake_short")) {
+            GLUfullsyn.gbase_c = 0.0045
+        } else if (!strcmp(state,"wake_long")) {
+            GLUfullsyn.gbase_c = 0.0045
+        }
+        GLUfullsyn.gbase_c = GLUfullsyn.gbase_c + 0.000001*devRi
+        if (!strcmp(state,"delta_long") || !strcmp(state,"slow_long") || !strcmp(state,"spindles_long") || !strcmp(state,"SWDs_long") || !strcmp(state,"wake_long")) {
+            GLUfullsyn.gbar_c = min(0.0017, (GLUfullsyn.gbase_c/0.000775)*0.0017)
+        } else {
+            GLUfullsyn.gbar_c = min(0.0017, (GLUfullsyn.gbase_c/0.0012)*0.0017)
+        }
+    }
+    GLUfullsyn.K1_c = 0.05          // (/ms mM) forward binding rate to receptor
+    GLUfullsyn.K2_c = 0.002 //0.0001        // (/ms)	 backward (unbinding) rate of receptor
+    GLUfullsyn.K3_c = 0.03          // (/ms)	 rate of G-protein production
+    GLUfullsyn.K4_c = 0.03          // (/ms)	 rate of G-protein decay
+    GLUfullsyn.KD_c = 0.0001        //           dissociation constant of K+ channel
+    GLUfullsyn.n_c = 4              //           nb of binding sites of G-protein on K+
+    GLUfullsyn.Erev_c = ekrev       //	(mV)	 reversal potential (E_K)
+    GLUfullsyn.Cmax_c = 0.5         //           short pulses
+    GLUfullsyn.Cdur_c = 1.4
+    GLUfullsyn.weight_c = 1
+    if (randomise.x[5]) {
+        GLUfullsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GLUfullsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GLUfullsynList.append(GLUfullsyn)
+    synList.append(GLUfullsyn)
+    soma.g_pas = 0
+}
+
+proc createGABAAsyn() {localobj r // $1 - release probability
+    soma GABAAsyn = new GABAa_S(0.5)
+    GABAAsyn.gbar = 1       // 1.52mV, 2.6ms, 17.9ms: 1, 0.05, 2, 0.5, 1.4, -80, 1
+    GABAAsyn.Alpha = 0.05
+    GABAAsyn.Beta = 2
+    GABAAsyn.Cmax = 0.5
+    GABAAsyn.Cdur = 1.4
+    GABAAsyn.Erev = GABAarev       // see Pinault et al. (2003)
+    if (randomise.x[5]) {
+        GABAAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GABAAsynList.append(GABAAsyn)
+    synList.append(GABAAsyn)
+}
+
+proc createGABAsyn() {localobj r    // $1 - release probability
+    soma GABAsyn = new GABA_S(0.5)
+    GABAsyn.gbar_a = 1      // 1.52mV, 2.6ms, 17.9ms: 1, 0.05, 2, 0.5, 1.4, -80, 1
+    GABAsyn.Alpha_a = 0.05
+    GABAsyn.Beta_a = 2
+    GABAsyn.Cmax_a = 0.5
+    GABAsyn.Cdur_a = 1.4
+    GABAsyn.Erev_a = GABAarev       // see Pinault et al. (2003)
+    GABAsyn.weight_a = 1
+    GABAsyn.gbar_b = 0.61   // 0.61, 0.2, 0.0028, 0.28, 0.45, 100, 4, -90, 0.5, 1.4: -2.9956 mV, 108.77 ms, 82.72 ms (in response to a burst)
+    GABAsyn.K1_b = 0.2      //	(/ms mM) forward binding rate to receptor
+    GABAsyn.K2_b = 0.0028   //	(/ms)	 backward (unbinding) rate of receptor
+    GABAsyn.K3_b = 0.28     //	(/ms)	 rate of G-protein production
+    GABAsyn.K4_b = 0.45     //	(/ms)	 rate of G-protein decay
+    GABAsyn.KD_b = 100      //           dissociation constant of K+ channel
+    GABAsyn.n_b = 4         //           nb of binding sites of G-protein on K+
+    GABAsyn.Erev_b = ekrev  //	(mV)	 reversal potential (E_K)
+    GABAsyn.Cmax_b = 0.5    //           short pulses
+    GABAsyn.Cdur_b = 1.4
+    if (randomise.x[5]) {
+        GABAsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+
+    
+
+    GABAsynList.append(GABAsyn)
+    synList.append(GABAsyn)
+}
+
+proc createGABAfullsyn() {localobj r    // $1 - release probability
+    soma GABAfullsyn = new GABA_S2(0.5)
+    if (!strcmp(section, "FO")) {
+        GABAfullsyn.gbar_a = 1          // 1.52mV, 2.6ms, 17.9ms: 1, 0.05, 2, 0.5, 1.4, -80, 1
+    } else if (!strcmp(section, "HO")) {
+        GABAfullsyn.gbar_a = 1
+    }
+    GABAfullsyn.Alpha_a = 0.05
+    GABAfullsyn.Beta_a = 2
+    GABAfullsyn.Cmax_a = 0.5
+    GABAfullsyn.Cdur_a = 1.4
+    GABAfullsyn.Erev_a = -80 //GABAarev       // see Pinault et al. (2003)
+    GABAfullsyn.weight_a = 1
+    if (!strcmp(section, "FO")) {
+        GABAfullsyn.gbar_b = 0.2*0.61   // 0.61, 0.2, 0.0028, 0.28, 0.45, 100, 4, -90, 0.5, 1.4: -2.9956 mV, 108.77 ms, 82.72 ms (in response to a burst)
+                                        // 0.00061, 0.2, 0.0028, 0.28, 0.045, 100, 4, -90, 0.5, 1.4
+    } else if (!strcmp(section, "HO")) {
+        GABAfullsyn.gbar_b = 0.2*0.61
+    }
+    GABAfullsyn.K1_b = 0.2              // (/ms mM) forward bindin0.1*0.61g rate to receptor
+    GABAfullsyn.K2_b = 0.0028           // (/ms)	backward (unbinding) rate of receptor
+    GABAfullsyn.K3_b = 0.28             // (/ms)	rate of G-protein production
+    GABAfullsyn.K4_b = 0.45             // (/ms)	rate of G-protein decay
+    GABAfullsyn.KD_b = 0.0195           //          dissociation constant of K+ channel: 16 - 0.000009, 12 - 0.000042, 8 - 0.0195
+    GABAfullsyn.n_b = 8                 //          nb of binding sites of G-protein on K+
+    GABAfullsyn.Erev_b = ekrev          // (mV)     reversal potential (E_K)
+    GABAfullsyn.Cmax_b = 0.5            //          short pulses
+    GABAfullsyn.Cdur_b = 1.4
+    if (!strcmp(section, "FO")) {
+        GABAfullsyn.gbar_c = 0 //0.00065      // *0.6 (koefWeiTC)
+    } else {
+        GABAfullsyn.gbar_c = 0
+    }
+    GABAfullsyn.K1_c = 0.05             // (/ms mM) forward binding rate to receptor
+    GABAfullsyn.K2_c = 0.005            // (/ms)	backward (unbinding) rate of receptor
+    GABAfullsyn.K3_c = 0.03             // (/ms)	rate of G-protein production
+    GABAfullsyn.K4_c = 0.03             // (/ms)	rate of G-protein decay
+    GABAfullsyn.KD_c = 0.0001           //          dissociation constant of K+ channel
+    GABAfullsyn.n_c = 2                 //          nb of binding sites of G-protein on K+
+    GABAfullsyn.Erev_c = -80            //	(mV)
+    GABAfullsyn.Cmax_c = 0.5            //          short pulses
+    GABAfullsyn.Cdur_c = 1.4
+    GABAfullsyn.weight_c = 1
+    if (randomise.x[5]) {
+        GABAfullsyn.P_release = $1
+        r = new Random()
+        {r.Random123_globalindex(globalIndex)}
+        {r.Random123(rcount, gid)}
+        r.uniform(0,1)
+        GABAfullsyn.noiseFromRandom(r)
+        rlist.append(r)
+        rcount += 1
+    }
+    GABAfullsynList.append(GABAfullsyn)
+    synList.append(GABAfullsyn)
+}
+
+proc createSyn() {    // $s1 - the synapse type, $2 - release probability.
+    if (!strcmp($s1,"AMPA")) {
+        createAMPAsyn($2)
+    } else if (!strcmp($s1,"GLU")) {
+        createGLUsyn($2)
+    } else if (!strcmp($s1,"GLUfull")) {
+        createGLUfullsyn($2)
+    } else if (!strcmp($s1,"GABAa")) {
+        createGABAAsyn($2)
+    } else if (!strcmp($s1,"GABA")) {
+        createGABAsyn($2)
+    } else if (!strcmp($s1,"GABAfull")) {
+        createGABAfullsyn($2)
+    }
+}
+
+obfunc getSyn() {localobj syn   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        syn = AMPAsyn
+    } else if (!strcmp($s1,"GLU")) {
+        syn = GLUsyn
+    } else if (!strcmp($s1,"GLUfull")) {
+        syn = GLUfullsyn
+    } else if (!strcmp($s1,"GABAa")) {
+        syn = GABAAsyn
+    } else if (!strcmp($s1,"GABA")) {
+        syn = GABAsyn
+    } else if (!strcmp($s1,"GABAfull")) {
+        syn = GABAfullsyn
+    }
+    return syn
+}
+
+obfunc getSynList() {localobj list   // $s1 - the synapse type.
+    if (!strcmp($s1,"AMPA")) {
+        list = AMPAsynList
+    } else if (!strcmp($s1,"GLU")) {
+        list = GLUsynList
+    } else if (!strcmp($s1,"GLUfull")) {
+        list = GLUfullsynList
+    } else if (!strcmp($s1,"GABAa")) {
+        list = GABAAsynList
+    } else if (!strcmp($s1,"GABA")) {
+        list = GABAsynList
+    } else if (!strcmp($s1,"GABAfull")) {
+        list = GABAfullsynList
+    } else {
+        list = synList
+    }
+    return list
+}
+
+proc createMini() {localobj mini, r	// $s1 - the synapse type, $2 - number of input streams.
+    mini = new minis()
+    mini.noise = 1
+    r = new Random()
+    {r.Random123_globalindex(globalIndex)}
+    {r.Random123(rcount, gid)}
+    r.negexp(1)
+    mini.noiseFromRandom(r)
+    rlist.append(r)
+    rcount += 1
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU") || !strcmp($s1,"GLUfull")) {
+        mini.interval1 = 1*150*$2
+        mini.interval2 = 1*75*$2
+    	AMPAmini = mini
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA") || !strcmp($s1,"GABAfull")) {
+        mini.interval1 = 1*300*$2
+        mini.interval2 = 1*150*$2
+        GABAAmini = mini
+    }
+    minisList.append(mini)
+}
+
+obfunc getMini() {localobj mini     // $s1 - the synapse type
+    if (!strcmp($s1,"AMPA") || !strcmp($s1,"GLU") || !strcmp($s1,"GLUfull")) {
+    	mini = AMPAmini
+    } else if (!strcmp($s1,"GABAa") || !strcmp($s1,"GABA") || !strcmp($s1,"GABAfull")) {
+        mini = GABAAmini
+    }
+    return mini
+}
+
+func is_art() { return 0 }
+
+endtemplate TCcell

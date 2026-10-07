@@ -1,0 +1,204 @@
+/*----------------------------------------------------------------------------
+
+	The main simulation function
+	=================================================
+
+	The root simulation funcution for running all models, including:
+    - a single thalamocortical (TC) cell;
+    - a single nucleus reticularis thalami (NRT) cell;
+    - a thalamic network model;
+    - a single cortical (Cx) cell;
+    - a cortical network model;
+    - a thalamocortical network model.
+
+    Written by Martynas Dervinis, Cardiff University, 2013-2015.
+
+----------------------------------------------------------------------------*/
+
+
+
+
+
+strdef startTime, endTime // initialise the timer
+{system("date +%s%N", startTime)}
+
+{ load_file("nrngui.hoc") } // load the NEURON library
+
+
+
+
+
+// Set the basic simulation parameters:
+strdef state
+state = "awake_long"         // global network state: "none", "delta_short", "delta_long", "slow_short", "slow_long", "spindles_short", "spindles_long", "SWDs_short", "SWDs_long", "wake_short", "wake_long"
+celsius = 37                // temperature (degrees of Celsius)
+v_init = -65                // initial membrane potential (mV)
+saveData = 50               // save data into dat files?
+                            //      00 - no;
+                            //      10 - yes (fully);
+                            //      11 - yes (only time, Vm, and Ih data)
+                            //      12 - yes (only time, Vm, and glu data)
+                            //      20 - yes (only time and Vm data);
+                            //      30 - yes (only total synaptic current data for EEG estimation);
+                            //      40 - yes (only AMPA+NMDA and GABAa+GABAb current for EEG estimation);
+                            //      41 - yes (only AMPA current for EEG estimation);
+                            //      42 - yes (only NMDA current for EEG estimation);
+                            //      43 - yes (only GABAa current for EEG estimation);
+                            //      44 - yes (only GABAb current for EEG estimation);
+                            //      50 - yes (only time, Vm, AMPA+NMDA, and GABAa+GABAb current data).
+
+
+
+
+
+// Set the integration time step method:
+tstop = 1200e3              // simulation end time (ms)
+varDt = 0                   // variable time step method integration: 0 - no, 1 - yes
+varDt_local = 0             // use local variable time steps: 0 - no, 1 - yes
+tolTool = 0                 // estimate error tolerance factors: 0 - no, 1 - yes
+if (!varDt) {
+    dt = 0.25               // integration step (ms; only applies with gap junctions).
+                            // Use 0.25 for testing and 0.1 for making figures
+    steps_per_ms = dt       // NEURON graph resolution (slaves dt)
+}
+
+
+
+
+
+// Set up the parallelisation:
+pProc = 1                   // parallel configuration: 0 - no, 1 - yes. Use with network models only
+
+objref pc
+pc = new ParallelContext()
+
+
+
+
+
+// Set up the randomisation:
+objref randomise
+randomise = new Vector(7)
+randomise.x[0] = 1          // Randomise the cell positioning in the network: 0 - no, 1 - yes
+randomise.x[1] = 1          // Randomise the input resistance of a cell: 0 - no, 1 - yes
+randomise.x[2] = 1          // Randomise the synaptic delays: 0 - no, 1 - yes
+randomise.x[3] = 1          // Randomise the synaptic weights: 0 - no, 1 - yes
+randomise.x[4] = 1          // Introduce spontaneous synaptic events (minis): 0 - no, 1 - yes
+randomise.x[5] = 1          // Introduce synaptic release probabilities: 0 - no, 1 - yes
+randomise.x[6] = 0          // Introduce infra slow oscillation (ISO) amplitude variation: 0 - no, 1 - yes
+
+objref r
+if (randomise.x[0] || randomise.x[1] || randomise.x[2] || randomise.x[3] || randomise.x[4] || randomise.x[5]) {
+    r = new Random()
+    globalIndex = 0 // use the global index to change all instances of separate random streams at once (don't use pc.time as a seed, if want reproducibility)
+    {r.Random123_globalindex(globalIndex)}
+    randomInstance = 0 // incremented after generation of each new cell-non-specific random number stream
+    {r.Random123(randomInstance,0)} // set the random stream index; (randomInstance,0) is cell non-specific; use (randomInstance,gid) for cell-specific streams
+    {r.seq(0)} // initialise the random stream counter; automatically set to 0
+}
+
+
+
+
+
+// Set the model type and the run mode:
+modelType = 20              // model type
+runMode = 0                 // simulation type
+if (!modelType) {
+    print ""
+    print "Select the simulation model (var: modelType) :"
+    print "   1  - single TC cell;"
+    print "   2  - single NRT cell;"
+    print "   3  - NRT nucleus;"
+    print "   4  - thalamus (minimal sleep spindle);"
+    print "   5  - thalamus;"
+    print "   6  - single Cx1 cell (Mainen and Sejnowski 1996);"
+    print "   7  - single Cx2 cell (Timofeev et al. 2000);"
+    print "   8  - single Cx3 cell (Used in the network model);"
+    print "   9  - single RS cell;"
+    print "   10 - single 'Early firing' RS cell;"
+    print "   11 - single IB cell;"
+    print "   12 - single RIB cell;"
+    print "   13 - single 'Network driver' IB cell;"
+    print "   14 - single FS cell;"
+    print "   15 - single SIB cell;"
+    print "   16 - single LTS cell;"
+    print "   17 - cortical layer V;"
+    print "   18 - pathological cortical layer V;"
+    print "   19 - cortex (full);"
+    print "   20 - thalamocortical network."
+    print ""
+    print "Select the simulation type (var: runMode) :"
+    print "   0  - single run without a clamp;"
+    print "   1  - multiple runs using a voltage clamp (i.e., for I-V curve);"
+    print "   2  - single run using a current clamp;"
+    print "   3  - single run using a current clamp for estimating apparent R_i and the membrane time constant;"
+    print "   4  - single run using a current clamp for estimating error tolerances when using the variable time step method;"
+    print "   5  - multiple runs using a current clamp for estimating apparent R_i;"
+    print "   6  - explore oscillation parameters with a custom algorithm;"
+    print "   7  - multiple runs combining current and voltage clamps;"
+    print "   8  - double run using a voltage clamp (i.e., for I_AHP adjustment in NRT cells);"
+    print "   9  - single run without a clamp for estimating cvode error tolerances."
+    print ""
+    quit()
+}
+
+
+
+
+
+// Load custom templates and procedures:
+{ load_file("procs.hoc") }
+{ load_file("netProcs.hoc") }
+{ load_file("temps.hoc") }
+{ load_file("runProcs.hoc") }
+
+
+
+
+
+// Run the simulation:
+if (modelType == 1) {
+    { load_file("TCprocs.hoc") }
+} else if (modelType == 2) {
+    { load_file("NRTprocs.hoc") }
+} else if (modelType >= 3 && modelType <= 5) {
+    { load_file("thalamusProcs.hoc") }
+} else if (modelType == 6) {
+    { load_file("Cx1procs.hoc") }
+} else if (modelType == 7) {
+    { load_file("Cx2procs.hoc") }
+} else if (modelType >= 8 && modelType <= 16) {
+    { load_file("Cx3procs.hoc") }
+} else if (modelType >= 17 && modelType <= 18) {
+    { load_file("L5procs.hoc") }
+} else if (modelType == 19) {
+    { load_file("Cxprocs.hoc") }
+} else if (modelType == 20) {
+    { load_file("ThCxprocs.hoc") }
+}
+
+
+
+
+
+{system("date +%s%N", endTime)} // stop the timer
+startTimeNum = str2numTime(startTime)
+endTimeNum = str2numTime(endTime)
+elapsedTime = endTimeNum - startTimeNum
+elapsedSec = int(elapsedTime*1e-6)
+elapseduSec = elapsedTime - elapsedSec*1e6
+elapsedMin = int(elapsedSec/60)
+elapsedH = int(elapsedMin/60)
+elapsedSec = elapsedSec%60
+elapsedMin = elapsedMin%60
+if (pProc) { {pc.barrier()} }
+if (!pProc || (pProc && pc.id==0)) {
+    strdef execTime
+    sprint(execTime, "Execution time (h:m:s): %g:%g:%g.%g", elapsedH, elapsedMin, elapsedSec, elapseduSec)
+    print execTime
+}
+
+if (runMode != 9) {
+    //quit()
+}

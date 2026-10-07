@@ -1,0 +1,312 @@
+// Perform thalamocortex-related computing and simulation routines
+
+isCx = 1
+if (isCx) {
+    isL5 = 0
+}
+isFO = 1
+isHO = 1
+edge = 1
+
+objref vClampList_L23
+objref vClampList_L4
+objref vClampList_L5
+objref vClampList_L6
+objref vClampList_FO
+objref vClampList_HO
+objref stim, stim2, tolWindow
+{ load_file("ThCx.hoc") }
+if (isCx) {
+    vClampList_L5 = clampCells(cellLists_L5.o(0))
+    if (!isL5) {
+        vClampList_L23 = clampCells(cellLists_L23.o(0))
+        vClampList_L4 = clampCells(cellLists_L4.o(0))
+        vClampList_L6 = clampCells(cellLists_L6.o(0))
+    }
+}
+if (isFO) {
+    vClampList_FO = clampCells(cellLists_FO.o(0))
+}
+if (isHO) {
+    vClampList_HO = clampCells(cellLists_HO.o(0))
+}
+
+if (pProc) {
+    {pc.barrier()}
+    pc.setup_transfer()
+    {pc.barrier()}
+}
+
+    /*  A procedure for rescaling the error tolerances of states when using cvode. */
+    proc rescaleET() {local precision
+        if (varDt || varDt_local) {
+            //precision = 1e-5
+            precision = 1e-7
+            cvode.atolscale("v",            max(precision, 10))
+            cvode.atolscale("nai",          max(precision, 10))
+            cvode.atolscale("cai",          max(precision, 1e-5))
+            cvode.atolscale("m1_iahp",      max(precision, 1e-5))
+            cvode.atolscale("m2_iahp",      max(precision, 1e-7))
+            cvode.atolscale("m_ihvaCx",     max(precision, 0.0001))
+            cvode.atolscale("h_ihvaCx",     max(precision, 0.1))
+            cvode.atolscale("n_ikca",       max(precision, 0.01))
+            cvode.atolscale("a_ikf",        max(precision, 0.1))
+            cvode.atolscale("b_ikf",        max(precision, 0.1))
+            cvode.atolscale("n_im",         max(precision, 0.01))
+            cvode.atolscale("m_inapCx2",    max(precision, 0.01))
+            cvode.atolscale("m_itGHK",      max(precision, 0.1))
+            cvode.atolscale("h_itGHK",      max(precision, 0.01))
+            cvode.atolscale("p0_iarCx3CaD", max(precision, 1))
+            cvode.atolscale("p1_iarCx3CaD", max(precision, 1e-6))
+            cvode.atolscale("c_iarCx3CaD",  max(precision, 1))
+            cvode.atolscale("o1_iarCx3CaD", max(precision, 0.001))
+            cvode.atolscale("o2_iarCx3CaD", max(precision, 1e-7))
+            cvode.atolscale("m_hhCx",       max(precision, 0.01))
+            cvode.atolscale("h_hhCx",       max(precision, 0.1))
+            cvode.atolscale("n_hhCx",       max(precision, 0.0001))
+            cvode.atolscale("AMPA_S.Ron",   max(precision, 0.01))
+            cvode.atolscale("AMPA_S.Roff",  max(precision, 0.01))
+            cvode.atolscale("GABAa_S.Ron",  max(precision, 0.001))
+            cvode.atolscale("GABAa_S.Roff", max(precision, 0.001))
+        }
+    }
+
+    /*  A procedure for running a simple thalamocortical simulation. */
+    proc ThCxBasic() {local i, que  localobj data_L23, data_L4, data_L5, data_L6, data_FO, data_HO, dataVec_L23, \
+                      dataVec_L4, dataVec_L5, dataVec_L6, dataVec, dataVecTemp, tVec, dataMatrix, savData
+        if (saveData) {
+            if (isCx) {
+                data_L5 = dataMultiParallel(cellLists_L5.o(0), vClampList_L5, saveData)
+                if (!isL5) {
+                    data_L23 = dataMultiParallel(cellLists_L23.o(0), vClampList_L23, saveData)
+                    data_L4 = dataMultiParallel(cellLists_L4.o(0), vClampList_L4, saveData)
+                    data_L6 = dataMultiParallel(cellLists_L6.o(0), vClampList_L6, saveData)
+                }
+            }
+            if (isFO) {
+                data_FO = dataMultiParallel(cellLists_FO.o(0), vClampList_FO, saveData)
+            }
+            if (isHO) {
+                data_HO = dataMultiParallel(cellLists_HO.o(0), vClampList_HO, saveData)
+            }
+        }
+        runMain()
+        if (saveData == 40 && !varDt_local) {
+            dataVec_L23 = getEEG(data_L23, nodeGidLists_L23.o(0), gidLists_L23.o(0).min(), 2)
+            dataVec_L4 = getEEG(data_L4, nodeGidLists_L4.o(0), gidLists_L4.o(0).min(), 4)
+            dataVec_L5 = getEEG(data_L5, nodeGidLists_L5.o(0), gidLists_L5.o(0).min(), 5)
+            dataVec_L6 = getEEG(data_L6, nodeGidLists_L6.o(0), gidLists_L6.o(0).min(), 6)
+            dataVec_L6.add(dataVec_L23)
+            dataVec_L6.add(dataVec_L4)
+            dataVec_L6.add(dataVec_L5)
+            if (pProc) {
+                dataVecTemp = new Vector(dataVec_L6.size())
+                dataVec = new Vector(dataVec_L6.size())
+                for i = 0, pc.nhost()-1 {
+                    dataVecTemp.copy(dataVec_L6)
+                    {pc.barrier()}
+                    pc.broadcast(dataVecTemp, i)
+                    {pc.barrier()}
+                    dataVec.add(dataVecTemp)
+                }
+            } else {
+                dataVec = dataVec_L6
+            }
+            tVec = new Vector(dataVec_L6.size())
+            if (pProc) {pc.barrier()}
+            for i = 0, data_L23.count()-1 {
+                if (cellLists_L23.o(0).o(i).gid == 0) {
+                    tVec = data_L23.o(i).rect
+                    if (pProc) {
+                        pc.broadcast(tVec, pc.id)
+                    }
+                }
+                if (pProc) {pc.barrier()}
+            }
+            if (pProc) {pc.barrier()}
+            dataMatrix = new Matrix()
+            dataMatrix.resize(2, tVec.size())
+            dataMatrix.setrow(0, tVec)
+            dataMatrix.setrow(1, dataVec)
+            if ((pProc && pc.id == 0) || !pProc) {
+                savData = new File()
+                savData.wopen("EEGdata.dat")
+                dataMatrix.fprint(savData, "%g\t")
+                savData.close()
+            }
+        } else if (saveData) {
+            que = 1
+            if (pProc) { que = pc.nhost }
+            for i = 0,que-1 {
+                if (!pProc || (pProc && pc.id==i)) {
+                    if (isCx) {
+                        if (!isL5) {
+                            saveMultiParallelCx(data_L23, cellLists_L23.o(0), nodeGidLists_L23.o(0), \
+                                cellTypeInd_L23, gidLists_L23, gidLists_L23.o(0).min(), 2)
+                            saveMultiParallelCx(data_L4, cellLists_L4.o(0), nodeGidLists_L4.o(0), \
+                                cellTypeInd_L4, gidLists_L4, gidLists_L4.o(0).min(), 4)
+                        }
+                        saveMultiParallelCx(data_L5, cellLists_L5.o(0), nodeGidLists_L5.o(0), \
+                            cellTypeInd_L5, gidLists_L5, gidLists_L5.o(0).min(), 5)
+                        if (!isL5) {
+                            saveMultiParallelCx(data_L6, cellLists_L6.o(0), nodeGidLists_L6.o(0), \
+                                cellTypeInd_L6, gidLists_L6, gidLists_L6.o(0).min(), 6)
+                        }
+                    }
+                    if (isFO) {
+                        saveMultiParallelTh(data_FO, cellLists_FO.o(0), nodeGidLists_FO.o(0), \
+                            cellTypeInd_FO, gidLists_FO, gidLists_FO.o(0).min(), 1)
+                    }
+                    if (isHO) {
+                        saveMultiParallelTh(data_HO, cellLists_HO.o(0), nodeGidLists_HO.o(0), \
+                            cellTypeInd_HO, gidLists_HO, gidLists_HO.o(0).min(), 2)
+                    }
+                }
+                if (pProc) { {pc.barrier()} }
+            }
+        }
+    }
+
+    
+    
+    /*  A procedure for running a thalamic model to produce a sleep spindle
+        oscillation. */
+    proc ThSpindles() {local i  localobj cell
+        for i = 0, cellLists_FO.o(1).count()-1 {
+            cell = cellLists_FO.o(1).o(i)
+            cell.soma.g_pas = 0.00002 //0.00001
+        }
+        for i = 0, cellLists_FO.o(4).count()-1 {
+            cell = cellLists_FO.o(4).o(i)
+            cell.soma.g_pas = 0.000025
+        }
+        ThCxBasic()
+    }
+
+
+
+
+
+
+
+rescaleET()
+
+if (runMode == 0) {
+    gid = 700
+    if (pc.gid_exists(gid, pc.id)) {
+        //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 20e3, 0.0575, "soma")
+    }
+    ThCxBasic()
+} else if (runMode == 2) {
+/*
+    gid = 349
+    if (pc.gid_exists(gid, pc.id)) {
+        cl = 1000/3.5
+        up = cl/2-65
+        down = cl/2+65
+        amp = 0.150
+        amp2 = -0.060
+        // 3s + 14 cycles + 1s
+        stim = stimFamily(pc.gid2cell(gid), 3e3, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, 1e3,   0, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, 0)
+        stim2 = stimFamily(pc.gid2cell(gid), 3e3+14*cl, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, up,down, 1e3,   0, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, amp,amp2, 0)
+    }
+*/
+/*
+    //gid = 349
+    //if (pc.gid_exists(gid, pc.id)) {
+    //    stim = stimSingle(pc.gid2cell(gid), 3e3, 4e3, 0.097, "soma")
+    //    stim2 = stimSingle(pc.gid2cell(gid), 0e3, 3e3, 0.075, "soma")
+    //}
+    gid = 424
+    if (pc.gid_exists(gid, pc.id)) {
+        stim = stimSingle(pc.gid2cell(gid), 3e3, 4e3, 0.113, "soma")
+        stim2 = stimSingle(pc.gid2cell(gid), 0e3, 3e3, 0.075, "soma")
+    }
+*/
+
+    strdef path
+    path = "NRTTC"
+    if (!strcmp(path, "TCCx")) {
+        // do nothing
+    } else if (!strcmp(path, "CxTC")) {
+        mGluRsTest = 1
+        gid = 500
+        if (pc.gid_exists(gid, pc.id)) {
+            if (mGluRsTest == 1) {
+                stim = stimSingle(pc.gid2cell(gid), 25e3, 150, 0.33, "soma")   // von Krosigk et al. (1999)
+            } else if (mGluRsTest == 2) {
+                stim = stimSingle(pc.gid2cell(gid), 25e3, 1.1e3, 0.038, "soma")
+            } else {
+                stim = stimSingle(pc.gid2cell(gid), 25e3, 5, 1, "soma")
+            }
+        }
+        gid = 600
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, 0.05, "soma")
+        }
+    } else if (!strcmp(path, "CxNRT")) {
+        gid = 500
+        if (pc.gid_exists(gid, pc.id)) {
+            stim = stimSingle(pc.gid2cell(gid), 25e3, 5, 1, "soma")
+        }
+        gid = 800
+        if (pc.gid_exists(gid, pc.id)) {
+            stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, -0.152, "soma")
+        }
+    } else if (!strcmp(path, "TCNRT")) {
+        gid = 800 //480
+        if (pc.gid_exists(gid, pc.id)) {
+            stim = stimSingle(pc.gid2cell(gid), 25e3, 5, 1, "soma")
+        }
+        gid = 580
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, 0.1, "soma")
+        }
+    } else if (!strcmp(path, "NRTTC")) {
+        gid = 724
+        if (pc.gid_exists(gid, pc.id)) {
+            stim = stimSingle(pc.gid2cell(gid), 1e3, 100, 0.01525, "soma")
+            //stim2 = stimSingle(pc.gid2cell(gid), 5.085e3, 5e3, -0.9, "soma")
+        }
+        /* gid = 480
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, 0.1, "soma")
+        }
+        gid = 650
+        if (pc.gid_exists(gid, pc.id)) {
+            stim = stimSingle(pc.gid2cell(gid), 0e3, 10e3, 0, "soma")
+        }
+        gid = 800
+        if (pc.gid_exists(gid, pc.id)) {
+            stim2 = stimSingle(pc.gid2cell(gid), 0e3, 10e3, 0, "soma")
+        } */
+    } else if (!strcmp(path, "NRTNRT")) {
+        gid = 724
+        if (pc.gid_exists(gid, pc.id)) {
+            stim = stimSingle(pc.gid2cell(gid), 25e3, 2, 1, "soma")
+        }
+        gid = 581
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, 0.1, "soma")
+        }
+    } else if (!strcmp(path, "CxCx")) {
+        gid = 350
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim = stimSingle(pc.gid2cell(gid), 25e3, 0.1e3, 0.45, "soma")  //GABAb
+            stim = stimSingle(pc.gid2cell(gid), 25e3, 0.01e3, 0.4, "soma")  //AMPA, NMDA, GABAa
+        }
+        gid = 351
+        if (pc.gid_exists(gid, pc.id)) {
+            //stim2 = stimSingle(pc.gid2cell(gid), 0e3, 30e3, 0.054, "soma")
+	        //for i = 0,vClampList_L5.count()-1 {
+            //    vClampAdj(vClampList_L5.o(i), 30e3, 0, 0, -60, 0, 0)
+            //}
+        }
+    }
+
+    ThCxBasic()
+} else if (runMode == 6) {
+    ThSpindles()
+} else if (runMode == 9) {
+    tolWindow = atoltool()
+}

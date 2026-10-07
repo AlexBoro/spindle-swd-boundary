@@ -1,0 +1,263 @@
+// Perform TC cell related computing and simulation routines
+
+objref cell, stim, stimMinisE, stimMinisI, synE, synI, ncSynE, ncSynI
+cell = new TCcell(0,0,"FO")
+//cell = new TCcell(0,0,"HO")
+
+
+
+/*  A procedure for rescaling the error tolerances of states when using cvode. */
+    proc rescaleET() {local precision
+        if (varDt || varDt_local) {
+            precision = 1e-5
+            cvode.atolscale("v",            max(precision, 10))
+            cvode.atolscale("m1_ia",        max(precision, 1))
+            cvode.atolscale("m2_ia",        max(precision, 0.1))
+            cvode.atolscale("h1_ia",        max(precision, 0.1))
+            cvode.atolscale("h2_ia",        max(precision, 0.1))
+            cvode.atolscale("cai",          max(precision, 1e-4))
+            cvode.atolscale("cahvai",       max(precision, 1e-5))
+            cvode.atolscale("mCa_icanmTC",    max(precision, 0.1))
+            cvode.atolscale("hCa_icanmTC",    max(precision, 1))
+            cvode.atolscale("m_ihvaTC",     max(precision, 0.001))
+            cvode.atolscale("m_ik1",        max(precision, 0.1))
+            cvode.atolscale("m_ik2",        max(precision, 0.1))
+            cvode.atolscale("h1_ik2",       max(precision, 0.1))
+            cvode.atolscale("h2_ik2",       max(precision, 0.1))
+            cvode.atolscale("m_inap",       max(precision, 1))
+            cvode.atolscale("m_it",         max(precision, 0.1))
+            cvode.atolscale("h_it",         max(precision, 0.01))
+            cvode.atolscale("p0_iarg",      max(precision, 1))
+            cvode.atolscale("p1_iarg",      max(precision, 0.0001))
+            cvode.atolscale("c_iarg",       max(precision, 1))
+            cvode.atolscale("o1_iarg",      max(precision, 0.001))
+            cvode.atolscale("o2_iarg",      max(precision, 1e-5))
+            cvode.atolscale("m_hhT",        max(precision, 1))
+            cvode.atolscale("h_hhT",        max(precision, 1))
+            cvode.atolscale("n_hhT",        max(precision, 0.1))
+            if (randomise.x[4]) {
+            cvode.atolscale("AMPA_S.Ron",   max(precision, 0.01))
+            cvode.atolscale("AMPA_S.Roff",  max(precision, 0.01))
+            cvode.atolscale("GABAa_S.Ron",  max(precision, 0.001))
+            cvode.atolscale("GABAa_S.Roff", max(precision, 0.001))
+            }
+        }
+    }
+
+
+
+/*  A procedure for setting up minis. */
+    proc miniStim() {local smooth
+        smooth = 1                          // increase to smooth the appearance of the voltage trace
+        stimMinisE = new minisI()
+        stimMinisE.interval = (1/smooth)*75
+        stimMinisE.noise = 1
+        cell.createSyn("AMPA", 1)
+        synE = cell.getSyn("AMPA")
+        ncSynE = new NetCon(stimMinisE, synE)
+        ncSynE.delay = 0
+        ncSynE.weight = (1/smooth)*0.04     // 0.04: ~0.2 mV @-65 mV and Ri = ~160 MOhms
+        stimMinisI = new minisI()
+        stimMinisI.interval = (1/smooth)*150
+        stimMinisI.noise = 1
+        cell.createSyn("GABAa", 1)
+        synI = cell.getSyn("GABAa")
+        ncSynI = new NetCon(stimMinisI, synI)
+        ncSynI.delay = 0
+        ncSynI.weight = 0.5*(1/smooth)*0.375     // 0.125: ~-0.2 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -80 mV
+                                             // 0.375: ~-0.2 mV @-65 mV, Ri = ~160 MOhms, and GABAarev = -70 mV
+    }
+
+
+
+/*  A procedure for exploring the role of I_h papameters in determining the
+    oscillatory behaviour of the TC cell. */
+    proc testIh() {local hType, i, j, k, k2, l, power  localobj data, clamp
+        if (saveData) {
+            data = new TCdata(cell, clamp, saveData)
+        }
+        hType = $1
+        //for (i = 0.000055; i <= 0.000055; i += 0.00001) {
+        for (i = 0.00011; i <= 0.00011; i += 0.00001) {
+        //for (i = 0.00012; i <= 0.00012; i += 0.00001) {
+        //for (i = 0.00018; i <= 0.00018; i += 0.00001) {
+        //for (i = 0.00024; i <= 0.00024; i += 0.00001) {
+        //for (i = 0.00061; i <= 0.00061; i += 0.00001) {
+            if (hType) {
+                cell.soma.ghbar_iarg = i
+            } else {
+                cell.soma.ghbar_iarreg = i
+            }
+            for (j = 0; j <= 0; j += 5) {
+                if (hType) {
+                    cell.soma.shift_iarg = j
+                } else {
+                    cell.soma.shift_iarreg = j
+                }
+                //for (k = 1; k <= 41; k += 1) {
+                    //k2 = (k%10)*10^(-7+int(k/10))
+                //for (k = 0.0000620; k <= 0.0000620; k += 0.0000010) {
+                for (k = 0.0001000; k <= 0.0001250; k += 0.0000010) {
+                //for (k = 0.0001000; k <= 0.0001000; k += 0.0000010) {
+                    k2 = k
+                    cell.soma.g_pas = k2
+                    for (l = 0; l <= 0; l += 0.001) {
+                    //for (l = -0.0600; l <= 0.2000; l += 0.001) {
+                    //for (l = -0.3200; l <= -0.0610; l += 0.001) {
+                    //for (l = -0.4200; l <= 0.1000; l += 0.001) {
+                    //for (l = 0; l <= 0.2500; l += 0.001) {
+                    //for (l = -0.6400; l <= 0.1000; l += 0.001) {
+                    //for (l = 0.0750; l <= 0.0750; l += 1) {
+                        stimSingleAdj(stim, 0, tstop, -l)
+                        runMain()
+                        if (saveData) {
+                            strdef dataFile
+                            if (varDt && !varDt_local) {
+                                sprint(dataFile, "x%g_TCdata%1.6f_%3.1f_%1.9f_%1.4f.dat", saveData, i, 75-j, k2, l)
+                            } else if (varDt && varDt_local) {
+                                sprint(dataFile, "y%g_TCdata%1.6f_%3.1f_%1.9f_%1.4f.dat", saveData, i, 75-j, k2, l)
+                            } else {
+                                sprint(dataFile, "z%g_TCdata%1.6f_%3.1f_%1.9f_%1.4f.dat", saveData, i, 75-j, k2, l)
+                            }
+                            data.save(dataFile)
+                        }
+                    }
+                }
+                print -75+j
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the role of I_T papameters in determining the
+    oscillatory behaviour of the TC cell. */
+    proc testIT() {local i, j, k, l, m  localobj data, clamp
+        if (saveData) {
+            data = new TCdata(cell, clamp, saveData)
+        }
+        for (i = 0.000086; i <= 0.000086; i += 0.00001) {
+            cell.soma.pcabar_itGHK = i
+            for (j = 0; j <= 0; j += 1) {
+                cell.soma.mshift_itGHK = j
+                for (k = 0; k <= 0; k += 1) {
+                    cell.soma.hshift_itGHK = k
+                    for (l = 7; l <= 7; l += 1) {
+                        cell.soma.km_itGHK = l
+                        for (m = 4.0; m <= 4.0; m += 0.5) {
+                            cell.soma.kh_itGHK = m
+                            for (n = 0.0000192; n <= 0.0000500; n += 0.0000001) {
+                                cell.soma.g_pas = n
+                                runMain()
+                                if (saveData) {
+                                    strdef dataFile
+                                    sprint(dataFile, "TCdata%1.6f_%1.0f_%1.0f_%1.1f_%1.2f_%1.7f.dat", i, j, k, l, m, n)
+                                    data.save(dataFile)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+
+/*  A procedure for exploring the role of I_AHP papameters in determining
+    the depth and duration of AHP. */
+    proc testIAHP() {local i  localobj data, clamp
+        if (saveData) {
+            data = new TCdata(cell, clamp, saveData)
+        }
+        for i = 0, 2 {
+            if (i == 0) {
+                cell.soma.g_pas = 0.0000293
+                cell.soma.gkbar1_iahp = 0
+                cell.soma.gkbar2_iahp = 2.3*0.0017
+            } else if (i == 1) {
+                cell.soma.g_pas = 0.0000420
+                cell.soma.gkbar1_iahp = 2.9*0.0005
+                cell.soma.gkbar2_iahp = 0
+            } else {
+                cell.soma.g_pas = 0.0000493
+                cell.soma.gkbar1_iahp = 0
+                cell.soma.gkbar2_iahp = 0
+            }
+            runMain()
+            if (saveData) {
+                strdef dataFile
+                sprint(dataFile, "z%g_TCdata%g.dat", saveData, i)
+                data.save(dataFile)
+            }
+        }
+    }
+
+
+
+if (randomise.x[4]) {
+    miniStim()
+}
+
+rescaleET()
+
+if (runMode == 0) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    singleRun(cell, saveData)
+} else if (runMode == 1) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    //              order  start  limit  step  base  hold   dur1  dur2  dur3
+    vClampLoop(cell,    2,  -100,    40,    5, -118, -118,   3e3,  1e3,    0, saveData)
+    // test I_T: vClampLoop(cell,    2,  -100,     0,    5, -118, -118,   3e3,  1e3,    0, saveData)
+    // test I_T recovery: vClampLoopRec(cell, 2, -40, -90, -40, 5e3, 20, 70, saveData)
+    // test I_h: vClampLoop(cell,    2,  -110,   -40,    5,  -65,  -65,   5e3,  5e3,  5e3, saveData)
+    // test I_NaP: vClampLoop(cell,    2,  -100,     0,    5, -118, -118,   3e3,  1e3,    0, saveData)
+    // test I_A, I_K1, and I_K2: vClampLoop(cell,    2,  -100,    40,    5, -100, -100,   3e3,  1e3,  1e3, saveData)
+    // test I_HVA: vClampLoop(cell,    3,   -50,    50,    5,  -50,  -50,   1e3,  1e3,  1e3, saveData)
+    // test I_Na: vClampLoop(cell,    3,   -70,    40,    5,  -50, -111,   1e3,  1e3,  1e3, saveData)
+    // test burst: vClampLoop(cell,    2,   -85,   -85,    5,  -65,  -65,   3e3,  3e3,  0e3, saveData)
+} else if (runMode == 2) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    //                      dur1 dur2   dur3 dur4                                                      amp1    amp2 amp3    amp4
+    stim = stimFamily(cell, 2800, 200, 39800, 200,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,    0, 0.6875,   0, 0.6875,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    //stim = stimFamily(cell, 3e3,  50, 3e3, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0.22, -0.16, 0.133, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    //singleRun(cell, saveData)
+    testIAHP()
+} else if (runMode == 3) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    amp2 = -0.12 //0.0315
+    iStep = -0.02
+    amp3 = amp2 + iStep
+    dur = 5e3
+    dur2 = 15e3
+    //                     dur1 dur2 dur3                                                        amp1  amp2  amp3
+    stim = stimFamily(cell, dur,dur2, dur, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   0, amp2, amp3, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    singleRunRi(cell, iStep, dur, dur2, saveData)
+    amp = -0.152 //0
+    amp2 = amp+0.01
+    amp3 = amp-0.01
+    dur = 5e3
+    dur2 = 1e3
+    dur3 = dur - dur2
+    //                 dur1  dur2  dur3  dur4, dur5                                                   amp1  amp2 amp3  amp4 amp5
+    //stimFamilyAdj(stim, dur, dur2, dur3, dur2, dur3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, amp, amp2, amp, amp3, amp,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
+    //singleRunTau(cell, dur, dur2, saveData)
+} else if (runMode == 4) {
+    atoltool()
+} else if (runMode == 5) {
+    stimLoop(cell, 0, -0.1, -0.001, -0.150615, 10e3, saveData)
+} else if (runMode == 6) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    stim = stimSingle(cell, 0, 0, 0, "soma")
+    testIh(1)
+    //testIT()
+} else if (runMode == 7) {
+    addGraph("cell.soma.v(0.5)", 340, 120, 1500, 850)
+    stim = stimSingle(cell, 0, 3e3, -0.3, "soma")
+    //                order  start  limit  step  base  del  dur1  dur2
+    //delClampLoop(cell,    1,  -120,    20,    5,    0,3210, 5670,    0, saveData)
+    //delClampLoop(cell,    1,  -120,    20,    5,    0,3360, 5520,    0, saveData)   //8880
+    delClampLoop(cell,    1,  -120,    20,    5,    0,3400, 8880-3400,    0, saveData)     //8880
+    //delClampLoop(cell,    1,  -120,    20,    5,    0,0, 0,    0, saveData)     //8880
+    //delClampLoop(cell,    1,  -120,    20,    5,    0,4800,27600,    0, saveData)   //32400
+}

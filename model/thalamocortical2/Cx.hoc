@@ -1,0 +1,287 @@
+// Full cortex
+
+{ load_file("layer.hoc") }
+
+
+
+if (isCx) {
+    if (!isL5) {
+        createLayer("L23")  //0.5mV
+        createLayer("L4")   //0.5mV
+    }
+    createLayer("L5")   //0.5mV
+    //createLayer("pL5")
+    if (!isL5) {
+        createLayer("L6")   //0.25mV
+        //createLayer("pL6")
+    }
+}
+simplify = 6
+median = 1
+
+
+
+objref nc_L23PY_L4PY, nc_L23PY_L5PY, nc_L4PY_L23PY, nc_L4PY_L5PY, nc_L4PY_L6PY
+objref nc_L5PY_L23PY, nc_L5PY_L4PY, nc_L5PY_L6PY, nc_L6PY_L4PY, nc_L6PY_L5PY
+objref nc_L23PY_L4IN, nc_L23PY_L5IN, nc_L4PY_L23IN, nc_L4PY_L5IN, nc_L4PY_L6IN
+objref nc_L5PY_L23IN, nc_L5PY_L4IN, nc_L5PY_L6IN, nc_L6PY_L4IN, nc_L6PY_L5IN
+if (simplify == 1) {
+    ratio_L23_L4 = 0.01
+    ratio_L23_L5 = 0.10
+    ratio_L4_L23 = 0.10
+    ratio_L4_L5 = 0.01
+    ratio_L4_L6 = 0.01
+    ratio_L5_L23 = 0.05
+    ratio_L5_L4 = 0.01
+    ratio_L5_L6 = 0.10
+    ratio_L6_L4 = 0.10
+    ratio_L6_L5 = 0.01
+} else if (simplify == 2) {
+    ratio_L23_L4 = 0.01
+    ratio_L23_L5 = 0.10
+    ratio_L4_L23 = 0.15
+    ratio_L4_L5 = 0.05
+    ratio_L4_L6 = 0.05
+    ratio_L5_L23 = 0.05
+    ratio_L5_L4 = 0.01
+    ratio_L5_L6 = 0.10
+    ratio_L6_L4 = 0.10
+    ratio_L6_L5 = 0.01
+} else if (simplify == 3) {
+    ratio_L23_L4 = 0.01
+    ratio_L23_L5 = 0.10
+    ratio_L4_L23 = 0.15
+    ratio_L4_L5 = 0.10
+    ratio_L4_L6 = 0.05
+    ratio_L5_L23 = 0.05
+    ratio_L5_L4 = 0.01
+    ratio_L5_L6 = 0.10
+    ratio_L6_L4 = 0.10
+    ratio_L6_L5 = 0.01
+} else if (simplify == 4) {
+    ratio_L23_L4 = 0.01
+    ratio_L23_L5 = 0.10
+    ratio_L4_L23 = 0.15
+    ratio_L4_L5 = 0.10
+    ratio_L4_L6 = 0.10
+    ratio_L5_L23 = 0.05
+    ratio_L5_L4 = 0.01
+    ratio_L5_L6 = 0.10
+    ratio_L6_L4 = 0.10
+    ratio_L6_L5 = 0.01
+} else if (simplify == 5) {
+    ratio_L23_L4 = 0.03
+    ratio_L23_L5 = 0.20
+    ratio_L4_L23 = 0.25
+    ratio_L4_L5 = 0.09
+    ratio_L4_L6 = 0.09
+    ratio_L5_L23 = 0.09
+    ratio_L5_L4 = 0.03
+    ratio_L5_L6 = 0.15
+    ratio_L6_L4 = 0.15
+    ratio_L6_L5 = 0.03
+} else if (simplify == 6) {
+    ratio_L23_L4 = 0.03
+    ratio_L23_L5 = 0.12
+    ratio_L4_L23 = 0.12
+    ratio_L4_L5 = 0.09
+    ratio_L4_L6 = 0.09
+    ratio_L5_L23 = 0.09
+    ratio_L5_L4 = 0.03
+    ratio_L5_L6 = 0.12
+    ratio_L6_L4 = 0.12
+    ratio_L6_L5 = 0.03
+} else {
+    ratio_L23_L4 = 0.01
+    ratio_L23_L5 = 0.09
+    ratio_L4_L23 = 0.13
+    ratio_L4_L5 = 0.03
+    ratio_L4_L6 = 0.03
+    ratio_L5_L23 = 0.03
+    ratio_L5_L4 = 0.01
+    ratio_L5_L6 = 0.05
+    ratio_L6_L4 = 0.05
+    ratio_L6_L5 = 0.01
+}
+koefWeiP = 1.75*0.7
+koefWeiN = 1.75*0.7
+connectIN = 1
+synSpread_Cx = 1
+P_release_Cx = 0.2 //0.8
+
+proc connectLayers() {localobj amps
+    // L2/3PY-->L4PY:   //0.6: 0.5mV
+    nc_L23PY_L4PY = connect2pops(ratio_L23_L4, 1.5 +1, koefWeiP*$1, cellLists_L23.o(8), \
+                                 gidLists_L23.o(8), cellLists_L4.o(8), gidLists_L4.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L2/3PY-->L4IN:   //0.6: 0.5mV
+    if (connectIN) {
+        nc_L23PY_L4IN = connect2pops(ratio_L23_L4/2, 1.5 +1, koefWeiN*$2, cellLists_L23.o(8), \
+                                     gidLists_L23.o(8), cellLists_L4.o(9), gidLists_L4.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L2/3PY-->L5PY:
+    nc_L23PY_L5PY = connect2pops(ratio_L23_L5, 1.75 +1, koefWeiP*$3, cellLists_L23.o(8), \
+                                 gidLists_L23.o(8), cellLists_L5.o(8), gidLists_L5.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L2/3PY-->L5IN:
+    if (connectIN) {
+        nc_L23PY_L5IN = connect2pops(ratio_L23_L5/2, 1.75 +1, koefWeiN*$4, cellLists_L23.o(8), \
+                                     gidLists_L23.o(8), cellLists_L5.o(9), gidLists_L5.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L4PY-->L2/3PY:
+    nc_L4PY_L23PY = connect2pops(ratio_L4_L23, 1.5 +1, koefWeiP*$5, cellLists_L4.o(8), \
+                                 gidLists_L4.o(8), cellLists_L23.o(8), gidLists_L23.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L4PY-->L2/3IN:
+    if (connectIN) {
+        nc_L4PY_L23IN = connect2pops(ratio_L4_L23/2, 1.5 +1, koefWeiN*$6, cellLists_L4.o(8), \
+                                     gidLists_L4.o(8), cellLists_L23.o(9), gidLists_L23.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L4PY-->L5PY:
+    nc_L4PY_L5PY = connect2pops(ratio_L4_L5, 1.5 +1, koefWeiP*$7, cellLists_L4.o(8), \
+                                gidLists_L4.o(8), cellLists_L5.o(8), gidLists_L5.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L4PY-->L5IN:
+    if (connectIN) {
+        nc_L4PY_L5IN = connect2pops(ratio_L4_L5/2, 1.5 +1, koefWeiN*$8, cellLists_L4.o(8), \
+                                    gidLists_L4.o(8), cellLists_L5.o(9), gidLists_L5.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L4PY-->L6PY:
+    nc_L4PY_L6PY = connect2pops(ratio_L4_L6, 1.75 +1, koefWeiP*$9, cellLists_L4.o(8), \
+                                gidLists_L4.o(8), cellLists_L6.o(8), gidLists_L6.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L4PY-->L6IN:
+    if (connectIN) {
+        nc_L4PY_L6IN = connect2pops(ratio_L4_L6/2, 1.75 +1, koefWeiN*$10, cellLists_L4.o(8), \
+                                    gidLists_L4.o(8), cellLists_L6.o(9), gidLists_L6.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L5PY-->L2/3PY:
+    nc_L5PY_L23PY = connect2pops(ratio_L5_L23, 1.75 +1, koefWeiP*$11, cellLists_L5.o(8), \
+                                 gidLists_L5.o(8), cellLists_L23.o(8), gidLists_L23.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L5PY-->L2/3IN:
+    if (connectIN) {
+        nc_L5PY_L23IN = connect2pops(ratio_L5_L23/2, 1.75 +1, koefWeiN*$12, cellLists_L5.o(8), \
+                                     gidLists_L5.o(8), cellLists_L23.o(9), gidLists_L23.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L5PY-->L4PY:
+    nc_L5PY_L4PY = connect2pops(ratio_L5_L4, 1.5 +1, koefWeiP*$13, cellLists_L5.o(8), \
+                                gidLists_L5.o(8), cellLists_L4.o(8), gidLists_L4.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L5PY-->L4IN:
+    if (connectIN) {
+        nc_L5PY_L4IN = connect2pops(ratio_L5_L4/2, 1.5 +1, koefWeiN*$14, cellLists_L5.o(8), \
+                                    gidLists_L5.o(8), cellLists_L4.o(9), gidLists_L4.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L5PY-->L6PY:
+    nc_L5PY_L6PY = connect2pops(ratio_L5_L6, 1.5 +1, koefWeiP*$15, cellLists_L5.o(8), \
+                                gidLists_L5.o(8), cellLists_L6.o(8), gidLists_L6.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L5PY-->L6IN:
+    if (connectIN) {
+        nc_L5PY_L6IN = connect2pops(ratio_L5_L6/2, 1.5 +1, koefWeiN*$16, cellLists_L5.o(8), \
+                                    gidLists_L5.o(8), cellLists_L6.o(9), gidLists_L6.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L6PY-->L4PY:
+    nc_L6PY_L4PY = connect2pops(ratio_L6_L4, 2.5 +1, koefWeiP*$17, cellLists_L6.o(8), \
+                                gidLists_L6.o(8), cellLists_L4.o(8), gidLists_L4.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L6PY-->L4IN:
+    if (connectIN) {
+        nc_L6PY_L4IN = connect2pops(ratio_L6_L4/2, 2.5 +1, koefWeiN*$18, cellLists_L6.o(8), \
+                                    gidLists_L6.o(8), cellLists_L4.o(9), gidLists_L4.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+
+
+    // L6PY-->L5PY:
+    nc_L6PY_L5PY = connect2pops(ratio_L6_L5/2, 2.25 +1, koefWeiP*$19, cellLists_L6.o(8), \
+                                gidLists_L6.o(8), cellLists_L5.o(8), gidLists_L5.o(8), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    // L6PY-->L5IN:
+    if (connectIN) {
+        nc_L6PY_L5IN = connect2pops(ratio_L6_L5/2, 2.25 +1, koefWeiN*$20, cellLists_L6.o(8), \
+                                    gidLists_L6.o(8), cellLists_L5.o(9), gidLists_L5.o(9), synSpread_Cx, P_release_Cx, amps, edge, "GLU")
+    }
+}
+
+proc connectLayersMain() {
+    if (simplify) {
+        connectLayers(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)  // 1 - 0.5mV
+    } else {
+        if (median) {
+            connectLayers(0.5,0.5,1,1,1,1,1,1,2,2,1,1,0.5,0.5,1,1,1,1,0.5,0.5)
+        } else {
+            connectLayers(0.5,0.5,1.5,1.5,1.5,1.5,1.5,1.5,4.5,4.5,1,1,0.5,0.5,1,1,1,1,0.5,0.5)
+        }
+    }
+}
+
+
+
+proc adjLayerMinis() {local i  localobj cell, mini   //$o1 - cell list, $2 - a number of synapses
+    for i = 0,$o1.count()-1 {
+        cell = $o1.o(i)
+        mini = cell.getMini("AMPA")
+        mini.interval1 = 150*$2
+        mini.interval2 = 75*$2
+    }
+}
+
+proc adjMinis() {
+    // L2/3:
+    converge_L23PY = (gidLists_L5.o(8).size()*ratio_L5_L23 + gidLists_L4.o(8).size()*ratio_L4_L23)*synSpread_Cx*P_release_Cx \
+                     + gidLists_L23.o(8).size()*ratioPYPY_L23*synSpread_L*P_release_L
+    adjLayerMinis(cellLists_L23.o(8), converge_L23PY)
+    if (connectIN) {
+        converge_L23IN = (gidLists_L5.o(8).size()*ratio_L5_L23 + gidLists_L4.o(8).size()*ratio_L4_L23)*synSpread_Cx*P_release_Cx \
+                         + gidLists_L23.o(8).size()*ratioPYIN_L23*synSpread_L*P_release_L
+        adjLayerMinis(cellLists_L23.o(9), converge_L23IN)
+    }
+
+    // L4:
+    converge_L4PY = (gidLists_L6.o(8).size()*ratio_L6_L4 + gidLists_L5.o(8).size()*ratio_L5_L4 \
+                    + gidLists_L23.o(8).size()*ratio_L23_L4)*synSpread_Cx*P_release_Cx \
+                    + gidLists_L4.o(8).size()*ratioPYPY_L4*synSpread_L*P_release_L
+    adjLayerMinis(cellLists_L4.o(8), converge_L4PY)
+    if (connectIN) {
+        converge_L4IN = (gidLists_L6.o(8).size()*ratio_L6_L4 + gidLists_L5.o(8).size()*ratio_L5_L4 \
+                        + gidLists_L23.o(8).size()*ratio_L23_L4)*synSpread_Cx*P_release_Cx \
+                        + gidLists_L4.o(8).size()*ratioPYIN_L4*synSpread_L*P_release_L
+        adjLayerMinis(cellLists_L4.o(9), converge_L4IN)
+    }
+
+    // L5:
+    converge_L5PY = (gidLists_L6.o(8).size()*ratio_L6_L5 + gidLists_L4.o(8).size()*ratio_L4_L5 \
+                    + gidLists_L23.o(8).size()*ratio_L23_L5)*synSpread_Cx*P_release_Cx \
+                    + gidLists_L5.o(8).size()*ratioPYPY_L5*synSpread_L*P_release_L
+    adjLayerMinis(cellLists_L5.o(8), converge_L5PY)
+    if (connectIN) {
+        converge_L5IN = (gidLists_L6.o(8).size()*ratio_L6_L5 + gidLists_L4.o(8).size()*ratio_L4_L5 \
+                        + gidLists_L23.o(8).size()*ratio_L23_L5)*synSpread_Cx*P_release_Cx \
+                        + gidLists_L5.o(8).size()*ratioPYIN_L5*synSpread_L*P_release_L
+        adjLayerMinis(cellLists_L5.o(9), converge_L5IN)
+    }
+
+    // L6:
+    converge_L6PY = (gidLists_L5.o(8).size()*ratio_L5_L6 + gidLists_L4.o(8).size()*ratio_L4_L6)*synSpread_Cx*P_release_Cx \
+                    + gidLists_L6.o(8).size()*ratioPYPY_L6*synSpread_L*P_release_L
+    adjLayerMinis(cellLists_L6.o(8), converge_L6PY)
+    if (connectIN) {
+        converge_L6IN = (gidLists_L5.o(8).size()*ratio_L5_L6 + gidLists_L4.o(8).size()*ratio_L4_L6)*synSpread_Cx*P_release_Cx \
+                        + gidLists_L6.o(8).size()*ratioPYIN_L6*synSpread_L*P_release_L
+        adjLayerMinis(cellLists_L6.o(9), converge_L6IN)
+    }
+}
+
+if (isCx && !isL5) {
+    connectLayersMain()
+    if (randomise.x[4]) {
+        adjMinis()
+    }
+}

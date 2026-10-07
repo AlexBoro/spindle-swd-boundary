@@ -1,0 +1,261 @@
+/*----------------------------------------------------------------------------
+
+    CORTICAL EXCITATORY CELL #2
+	=================================
+
+	Simulations of a double-compartment model of a cortical excitatory cell.
+
+    The model was originally described by [1, 2] and is a modification of a
+    model described by [3] with the addition of the persistent Na+ current
+    I_Na(P). It consists of two, dendritic and axo-somatic, compartments
+    coupled via resistance, kappa, and related via the ratio of the
+    membrane surface areas, rho. The cell may have a different membrane
+    potential response depending on the values of these parameters. Hence,
+    it may be classed as regular-spiking (RS), intrinsically bursting (IB),
+    or fast-spiking (FS). For more details see ref. [3].
+
+    The cell is adapted to be used in parallel network simulations if
+    necessary.
+    
+    The following active currents are included in the model (the references
+    describing the models are provided in the descriptions of the model
+    (.mod) files:
+        - HH mechanism: fast Na+ I_Na and K+ delayed rectifier I_K(DR)
+            currents. Required for action potential generation.
+        - I_M: slow non-inactivating muscarine-sensitive K+ current.
+        - I_HVA: high threshold calcium current.
+        - I_K[Ca]: Ca2+-activated K+ current I_K[Ca].
+        - I_Na(P): persistent low voltage-activated Na+ current.
+        - I_AMPA
+        - I_NMDA
+        - I_GABAa
+        - I_GABAb
+
+    References:
+    [1] Timofeev, I., Bazhenov, G.M., Sejnowski, T.J., and Steriade, M.
+        Origin of Slow Cortical Oscillations in Deafferented Cortical Slabs.
+        Cerebral Cortex, 10: 1185-1199, 2000.
+    [2] Bazhenov, M., Timofeev, I., Steriade, M., and Sejnowski, T.J. Model
+        of Thalamocortical Slow-Wave Sleep Oscillations and Transitions to
+        Activated States. Neuroscience, 22: 8691-8704, 2002.
+    [3] Mainen, Z.F. and Sejnowski, T.J. Influence of dendritic structure
+        on firing pattern in model neocortical neurons. Nature, 382: 363-
+        366, 1996.
+
+    Written by Martynas Dervinis @Cardiff University, 2014.
+
+    *notes:
+    *1  - given enarev = 50, ekrev = -95, ecarev = 140, rho = 165
+          forall { g_pas = 1/30000, e_pas = -95, cm = 0.75 }
+          soma { diam = 5.644, L = 5.644, ena = enarev, ek = ekrev,
+            gnabar_hhCx2 = 30000E-4, gkbar_hhCx2 = 2000E-4,
+            gnabar_inapCx2 = 0.65E-4 }
+          dend { diam = 2*soma.diam, L = 0.5*rho*soma.L, depth_cad = 0.1,
+            taux_cad = 160, cainf_cad = 240e-6, ena = enarev, ek = ekrev,
+            gnabar_hhCx2 = 15E-4, gkbar_hhCx2 = 0, gkbar_imCx2 = 0.1E-4,
+            gkbar_ikca = 3E-4, gcabar_ihvaCx = 0.125E-4,
+            gnabar_inapCx2 = 0.65E-4 }
+          >> Vrest = -70 mV, Ri = 236.9 with stim.amp = -0.02 nA @ -65 mV
+                             Ri = 211.2 with stim.amp = -0.05 nA
+
+----------------------------------------------------------------------------*/
+
+
+
+begintemplate Cx2cell
+public soma, dend, enarev, ekrev, rho, synlist, connect2target, AMPAsynapse, NMDAsynapse, GABAAsynapse, GABABsynapse
+external cvode
+
+objref kl, synlist, syn
+
+create soma, dend
+
+proc init() {
+    insertNil = 1
+    insertExC = 1
+    insertHH = 1
+    insertIM = 1
+    insertIHVA = 1
+    insertIKCa = 1
+    insertINaP = 1
+    
+    synlist = new List()
+
+    enarev = 50
+    ekrev  = -95
+    ecarev = 140
+    rho    = 165
+
+    soma {
+        diam = 5.644
+        L = 5.644
+    }
+
+    dend {
+        //diam = sqrt(rho)*soma.diam
+        //L = sqrt(rho)*soma.L
+        diam = 2*soma.diam
+        L = 0.5*rho*soma.L
+    }
+    
+    connect dend(0), soma(1)
+
+
+
+    if (insertNil) {
+        /* soma {
+            insert pas
+            g_pas = 1/30000
+            e_pas = -70
+            cm = 0.75
+            Ra = 300 //150
+        } */
+
+        dend {
+            insert pas                                                      // Passive properties and nonspecific leak current. Only applies to the dend compartment
+            g_pas = 1/30000
+            e_pas = -70                                                     // -70 in Timofeev et al. (2000) and -68 in Bazhenov et al. (2002)
+            cm = 0.75
+            Ra = 300
+
+            /* insert kleak                                                    // K+ leak current used in Bazhenov et al. (2002). Only applies to the dend compartment
+            g_kleak = 0.025E-4
+            e_klaek = ekrev */
+
+            insert cad                                                      // Intracellular [Ca2+] decay
+            depth_cad = 0.1
+            taux_cad = 160
+            cainf_cad = 240e-6
+        }
+    }
+
+
+
+    if (insertExC && !cvode.active()) {
+        forall {
+        	insert extracellular                                            // Extracellular fields for monitoring total membrane current
+        }
+    }
+
+
+
+    if (insertHH) {
+        soma {                                                              // HH mechanism
+            insert hhCx2
+            ena = enarev
+            ek = ekrev
+            gnabar_hhCx2 = 30000E-4
+            gkbar_hhCx2 = 2000E-4
+        }
+
+        dend {
+            insert hhCx2
+            ena = enarev
+            ek = ekrev
+            gnabar_hhCx2 = 15E-4
+            gkbar_hhCx2 = 0
+        }
+    }
+
+
+
+    if (insertIM) {
+        dend {                                                              // I_M current
+            insert imCx2
+            ek = ekrev
+            gkbar_imCx2 = 0.1E-4
+        }
+    }
+
+
+
+    if (insertIHVA) {
+        dend {                                                              // I_HVA current
+            insert ihvaCx
+            eca = ecarev
+            gcabar_ihvaCx = 0.125E-4                                        // 0.1-0.15E-4 in Timofeev et al. (2000) and 0.1E-4 in Bazhenov et al. (2002)
+        }
+    }
+
+
+
+    if (insertIKCa) {
+        dend {                                                              // I_K[Ca] current
+            insert ikcaCx2
+            ek = ekrev
+            gkbar_ikcaCx2 = 3E-4
+        }
+    }
+
+
+
+    if (insertINaP) {
+        forall {                                                            // I_Na(P) Na+ low threshold persistent current
+            insert inapCx2
+            ena = enarev
+            gnabar_inapCx2 = 0.65E-4                                        // 0.6-0.7E-4 in Timofeev et al. (2000) and 0.7E-4 in Bazhenov et al. (2002)
+        }
+    }
+
+    //forall nseg = int((L/(0.1*lambda_f(100))+0.9)/2)*2 + 1                  // Lambda rule
+    forall nseg = 1
+}
+
+obfunc connect2target() {localobj nc //$o1 - target process, $2 - connection delay, $3 - connection weight
+    soma nc = new NetCon(&v(0.5), $o1)
+    nc.threshold = -15
+    nc.delay = $2
+    nc.weight = $3
+    return nc
+}
+
+proc AMPAsynapse() {
+    soma syn = new AMPA_S(0.5)
+    syn.gbar = 0.0148
+    syn.Alpha = 50
+    syn.Beta = 2
+    syn.Cmax = 0.5
+    syn.Cdur = 0.3
+    syn.Erev = $1
+    synlist.append(syn)
+}
+
+proc NMDAsynapse() {localobj syn
+    soma syn = new NMDA_S(0.5)
+    syn.gbar = 0.01
+    syn.Alpha = 0.71
+    syn.Beta = 0.03
+    syn.Cmax = 0.5
+    syn.Cdur = 0.3
+    syn.Erev = $1
+    syn.mg = 0.2
+    synlist.append(syn)
+}
+
+proc GABAAsynapse() {   // $1 - GABAa channel reversal potential
+    soma syn = new GABAa_S(0.5)
+    syn.gbar = 1       // 1, 0.006, 0.16, 0.5, 1.4, -80: 75.104 pA, 1.13 ms, 6.92 ms
+    syn.Alpha = 0.006
+    syn.Beta = 0.16
+    syn.Cmax = 0.5
+    syn.Cdur = 1.4
+    syn.Erev = $1
+    synlist.append(syn)
+}
+
+proc GABABsynapse() {
+    soma syn = new GABAb_S(0.5)
+    syn.gbar = 0.61       // 0.61, 0.2, 0.0028, 0.28, 0.45, 100, 4, -90, 0.5, 1.4: -2.9956 mV, 108.77 ms, 82.72 ms (in response to a burst)
+    syn.K1 = 0.2      //	(/ms mM) forward binding rate to receptor
+    syn.K2 = 0.0028    //	(/ms)	 backward (unbinding) rate of receptor
+    syn.K3 = 0.28      //	(/ms)	 rate of G-protein production
+    syn.K4 = 0.45      //	(/ms)	 rate of G-protein decay
+    syn.KD = 100       //            dissociation constant of K+ channel
+    syn.n = 4          //            nb of binding sites of G-protein on K+
+    syn.Erev = $1      //	(mV)	 reversal potential (E_K)
+    syn.Cmax = 0.5     //            short pulses
+    syn.Cdur = 1.4
+    synlist.append(syn)
+}
+
+endtemplate Cx2cell

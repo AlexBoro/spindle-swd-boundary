@@ -1,0 +1,18 @@
+// Load all object class definitions
+
+{ load_file("TCcell.hoc") }
+{ load_file("TCdata.hoc") }
+
+{ load_file("NRTcell.hoc") }
+{ load_file("NRTdata.hoc") }
+
+{ load_file("Cx1cell.hoc") }
+{ load_file("Cx1data.hoc") }
+
+{ load_file("Cx2cell.hoc") }
+{ load_file("Cx2data.hoc") }
+
+{ load_file("Cx3cell.hoc") }
+{ load_file("Cx3data.hoc") }
+//{ load_file("Cx3cell_full.hoc") }
+//{ load_file("Cx3data_full.hoc") }
