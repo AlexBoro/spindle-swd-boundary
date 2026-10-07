@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+# NEURON build products
+x86_64/
+*.o
+*.c
+!model/thalamocortical2/**/*.c
+# simulation output
+*.dat
+runs/
+out/
+.ipynb_checkpoints/
