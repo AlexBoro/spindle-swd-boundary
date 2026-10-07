@@ -1,0 +1,12 @@
+{
+  "description": "Criterion C4.1: +5% g_KL in TC_FO should give ~4 Hz SWDs. Set the gkl value to 1.05x the vendored baseline once read from TCcell.hoc.",
+  "init": {
+    "state": "awake_long",
+    "tstop": 60000,
+    "saveData": 40,
+    "dt": 0.25,
+    "modelType": 20,
+    "runMode": 0
+  },
+  "conductances": {}
+}

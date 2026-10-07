@@ -1,0 +1,12 @@
+{
+  "description": "Gate 0 baseline: slow (<1 Hz) oscillation state. Criteria C1.1-C1.4, C3.1.",
+  "init": {
+    "state": "slow_long",
+    "tstop": 60000,
+    "saveData": 50,
+    "dt": 0.25,
+    "modelType": 20,
+    "runMode": 0
+  },
+  "conductances": {}
+}
