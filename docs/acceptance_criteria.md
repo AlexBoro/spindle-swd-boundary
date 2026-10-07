@@ -88,6 +88,22 @@ axes must be genuinely independent paths, not one attractor reached several ways
 3. **Numeric tolerances are unset** pending (1). Until then each criterion is
    judged on the qualitative claim as stated.
 
+## Model facts established while instrumenting (not criteria)
+
+Recorded here because they bear on the axis design and were not obvious from the
+papers:
+
+1. **TC_HO carries twice the baseline T-type Ca²⁺ conductance of TC_FO.** In
+   `TCcell.hoc`, `gcabar_it` is assigned per thalamic order inside
+   `if (!strcmp(section, "FO"))` / `else if (... "HO")` branches: `0.0021` for
+   FO and `2*0.0021` for HO. Any override of this conductance must say which
+   order it means — the runner refuses an ambiguous override rather than
+   silently patching the first match.
+2. **Several right-hand sides are expressions, not literals.** Overrides are
+   therefore expressed relative to baseline (`"1.05*0.0021"`) rather than as
+   absolute numbers, so a fold-change stays a fold-change if upstream baselines
+   are ever revised.
+
 ## Axis independence audit (blocks Phase 3)
 
 [B] implements increased tonic GABA-A inhibition of TC_FO as a **+5% increase in

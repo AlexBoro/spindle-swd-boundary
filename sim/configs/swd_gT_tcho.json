@@ -1,0 +1,19 @@
+{
+  "description": "Criterion C4.6: increased T-type Ca2+ conductance in TC_HO should give ~4 Hz SWDs. TC_HO baseline is 2*0.0021, i.e. twice TC_FO; occurrence=2 selects the HO branch.",
+  "init": {
+    "state": "awake_long",
+    "tstop": 60000,
+    "saveData": 40,
+    "dt": 0.25,
+    "modelType": 20,
+    "runMode": 0
+  },
+  "conductances": {
+    "TCcell.hoc": {
+      "gcabar_it": {
+        "value": "1.5*2*0.0021",
+        "occurrence": 2
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "description": "Criterion C4.1: +5% g_KL in TC_FO should give ~4 Hz SWDs. Set the gkl value to 1.05x the vendored baseline once read from TCcell.hoc.",
+  "description": "Criterion C4.1: +5% g_KL in TC_FO should give ~4 Hz SWDs (Dervinis & Crunelli 2023b). Set the g_KL override once the TC_FO baseline assignment is confirmed in TCcell.hoc; use the expression form so the +5% is relative to the vendored baseline.",
   "init": {
     "state": "awake_long",
     "tstop": 60000,
