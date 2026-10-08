@@ -54,9 +54,38 @@ population fires first.
 | C4.5 | Increasing **cortical AMPA** function produces ~4 Hz SWDs | [B] | TODO |
 | C4.6 | Increasing **T-type Ca²⁺ in TC_HO** produces ~4 Hz SWDs | [B] | TODO |
 | C4.7 | **Decreasing `g_KL` in TC_HO** produces **~7–8 Hz** SWDs while spindles remain at 7–14 Hz | [B] | TODO |
-| C4.8 | SWDs **invariably start in neocortical territories** | [B] | TODO |
+| C4.8 | SWDs **invariably start in neocortical territories**; Tables S1/S2 sharpen this to **leading structure = L4** in every case (see C4.16) | [B] | TODO |
 | C4.9 | Blocking `g_CAN` in NRT markedly **prolongs** SWD duration | [B] | TODO |
 | C4.10 | Physiological rhythms are only **minimally affected** by the conductance changes that produce SWDs | [B] | TODO |
+
+## 4b. SWD phenotype targets (Tables S1/S2, cns.14204 supplementary)
+
+Obtained from the supplementary appendix. These are **outcome** statistics, and
+they index everything by "pathology level 1/2/3" without ever defining a level in
+conductance units — see Known gaps.
+
+| ID | Criterion | Status |
+|---|---|---|
+| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all nine pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | TODO |
+| C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | TODO |
+| C4.13 | Mean interictal period **19.81–48.39 s** | TODO |
+| C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | TODO |
+| C4.15 | SWD incidence **1.01–1.85 min⁻¹** | TODO |
+| C4.16 | **Leading structure is L4 for every pathology column**, without exception | TODO |
+| C4.17 | Poly-spikes present in every pathology column | TODO |
+| C4.18 | Mean spike-to-wave amplitude **3.02–8.45 µV**; mean PSI **0.52–0.82** | TODO |
+| C4.19 | TC_FO cells fire **tonically and essentially never burst** during SWDs: bursting fraction 0 % in 7 of 9 columns (max 0.02 %), tonic-spiking fraction 5.43–88.16 % | TODO |
+| C4.20 | Phase of the first TC_HO action potential in the first second of an SWD is near zero or negative (−0.45 to +0.40 rad) while cortical layers are 1.04–2.76 rad — i.e. TC_HO leads | TODO |
+
+C4.19 is worth flagging beyond its role as a criterion: TC_FO relay cells are
+*tonically firing*, not T-type bursting, throughout these SWDs. That cuts against
+the classical burst-centred account of absence seizures and bears directly on how
+this project should interpret the T-current axes.
+
+Note on C5.1: Tables S1/S2 report **global** PSI, AP cross-correlation and AP–EEG
+correlation. The route-discrimination claim in the main text concerns **pairwise**
+L5PY–NRT and L4PY–TC_HO synchrony (Figure 4C4), which is a different measure.
+C5.1 must still be checked against the figure, not these columns.
 
 ## 5. Route discrimination
 
@@ -78,14 +107,36 @@ axes must be genuinely independent paths, not one attractor reached several ways
 
 ## Known gaps
 
-1. **Supplementary Tables S1, S2 and S8 are not in the PMC full text.** They hold
-   the exact conductance values and the SWD frequency / duration / interictal
-   statistics. Obtain them from the Wiley supplementary material or from the
-   authors before finalising tolerances on C1.1, C4.1–C4.4.
-2. **No published spindle density or duration figures** — see §2. Do not invent a
+1. **RESOLVED IN PART — Tables S1/S2 obtained** (cns.14204 supplementary
+   appendix). They supply the SWD frequency / duration / interictal statistics,
+   now recorded as criteria C4.11–C4.20.
+
+2. **STILL OPEN, AND BLOCKING: the conductance values themselves.** Tables S1/S2
+   index every column by "pathology level 1/2/3" and nowhere state what a level
+   *is* in conductance units. Only two mappings are recoverable, by inference from
+   the main text: reduced cortical g_GABAa levels 1 and 2 are the quoted −10 % and
+   −25 %, and the TC_FO I_KL route is introduced at +5 %. Unknown: I_KL levels 2
+   and 3; extrasynaptic g_eGABAa levels 1–3; cortical AMPA levels 1–2; I_T in NRT
+   level 1; **I_T in TC_HO levels 1–2** — the last being the axis this project
+   nominates as primary. Without these the published SWD points cannot be located
+   in parameter space, so the Phase 3 boundary calibration has no anchor.
+
+3. **Table S8 is in the other paper's supplement.** It was cited in the
+   *sleep-waves* companion (cns.14206), not the SWD paper, so it was never going
+   to be in this file. Request the cns.14206 supplementary appendix.
+
+4. **Evidence that the model parameters live in the cns.14206 supplement:** the
+   Figure S1 legend in *this* appendix says the synaptic connection strengths are
+   given "in Supplementary Table 1" — but Table S1 here is SWD outcome statistics,
+   not connection strengths. That cross-reference resolves to the companion
+   paper's supplementary tables, which is where the model specification (and
+   Table S8's g_KL values) should be found.
+5. **No published spindle density or duration figures** — see §2. Figure S2 of
+   this appendix does display simulated slow, delta and spindle waves, but its
+   legend carries no quantities, so it does not close the gap. Do not invent a
    tolerance; use the sequence criteria and report measured spindle statistics as
    new characterisation rather than as a reproduction test.
-3. **Numeric tolerances are unset** pending (1). Until then each criterion is
+6. **Numeric tolerances are unset** for the conductance-indexed criteria pending (2). Until then each criterion is
    judged on the qualitative claim as stated.
 
 ## Model facts established while instrumenting (not criteria)
