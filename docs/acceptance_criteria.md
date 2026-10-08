@@ -62,19 +62,21 @@ population fires first.
 
 Obtained from the supplementary appendix. These are **outcome** statistics, and
 they index everything by "pathology level 1/2/3" without ever defining a level in
-conductance units — see Known gaps.
+conductance units — see Known gaps. Ranges below are over all **15** pathology
+columns: 6 in Table S1 (tonic inhibition of TC_FO, two routes × three levels) and
+9 in Table S2 (five other routes).
 
 | ID | Criterion | Status |
 |---|---|---|
-| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all nine pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | TODO |
+| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all 15 pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | TODO |
 | C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | TODO |
 | C4.13 | Mean interictal period **19.81–48.39 s** | TODO |
 | C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | TODO |
 | C4.15 | SWD incidence **1.01–1.85 min⁻¹** | TODO |
-| C4.16 | **Leading structure is L4 for every pathology column**, without exception | TODO |
-| C4.17 | Poly-spikes present in every pathology column | TODO |
+| C4.16 | **Leading structure is L4 in all 15 pathology columns**, without exception | TODO |
+| C4.17 | Poly-spikes present in all 15 pathology columns | TODO |
 | C4.18 | Mean spike-to-wave amplitude **3.02–8.45 µV**; mean PSI **0.52–0.82** | TODO |
-| C4.19 | TC_FO cells fire **tonically and essentially never burst** during SWDs: bursting fraction 0 % in 7 of 9 columns (max 0.02 %), tonic-spiking fraction 5.43–88.16 % | TODO |
+| C4.19 | TC_FO cells fire **tonically and essentially never burst** during SWDs: bursting fraction is exactly 0 % in **13 of 15** columns, the only exceptions being 0.0034 % (I_KL level 3) and 0.02 % (increased I_T in NRT); tonic-spiking fraction 5.43–88.16 % | TODO |
 | C4.20 | Phase of the first TC_HO action potential in the first second of an SWD is near zero or negative (−0.45 to +0.40 rad) while cortical layers are 1.04–2.76 rad — i.e. TC_HO leads | TODO |
 
 C4.19 is worth flagging beyond its role as a criterion: TC_FO relay cells are
