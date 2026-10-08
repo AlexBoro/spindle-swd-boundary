@@ -113,7 +113,16 @@ axes must be genuinely independent paths, not one attractor reached several ways
    appendix). They supply the SWD frequency / duration / interictal statistics,
    now recorded as criteria C4.11–C4.20.
 
-2. **STILL OPEN, AND BLOCKING: the conductance values themselves.** Tables S1/S2
+2. **LARGELY RESOLVED — baselines obtained** from the cns.14206 supplementary
+   (Tables S1–S13) and cross-validated against the vendored code; see
+   `docs/model_parameters.md`. Three axes are now fully anchored (cortical GABA-A
+   −10 %/−25 % of 0.068; TC_FO leak with the authors' own SWD threshold of
+   0.0013792 against a 0.001325 wake baseline; TC_HO leak 0.0045 → 0.0028 for the
+   ~7 Hz route). **Still open:** pathology levels for extrasynaptic g_eGABAa,
+   cortical AMPA, NRT I_T and **TC_HO I_T** — the last being this project's
+   nominated primary axis.
+
+   Superseded text: the conductance values themselves. Tables S1/S2
    index every column by "pathology level 1/2/3" and nowhere state what a level
    *is* in conductance units. Only two mappings are recoverable, by inference from
    the main text: reduced cortical g_GABAa levels 1 and 2 are the quoted −10 % and
@@ -123,7 +132,10 @@ axes must be genuinely independent paths, not one attractor reached several ways
    nominates as primary. Without these the published SWD points cannot be located
    in parameter space, so the Phase 3 boundary calibration has no anchor.
 
-3. **Table S8 is in the other paper's supplement.** It was cited in the
+3. **RESOLVED — Table S8 obtained.** It was in the *sleep-waves* companion
+   supplement (cns.14206), as expected.
+
+   Superseded text: Table S8 is in the other paper's supplement. It was cited in the
    *sleep-waves* companion (cns.14206), not the SWD paper, so it was never going
    to be in this file. Request the cns.14206 supplementary appendix.
 
