@@ -6,22 +6,44 @@ contract so the port is well defined. Criterion C6.1 in
 docs/acceptance_criteria.md is not satisfied until `validate_against_matlab`
 passes.
 
-Specification taken from the MATLAB source and from Dervinis & Crunelli 2023
-(doi:10.1111/cns.14204):
+Algorithm, quoted from the MATLAB source's own docstring (the authoritative
+statement; the paper gives only the filter settings):
 
-* Input is an EEG vector plus the sampling interval `dt` in ms. The model's EEG
-  proxy is the summed synaptic current (`saveData = 30/40` modes).
-* Spikes are detected on the EEG; a spike is classed "large" when it exceeds
-  **1.96 SD** relative to the EEG baseline. The MATLAB returns both the full and
-  large-spike-demarcated variants of every downstream quantity.
-* SWDs are demarcated by spikes; waves are the troughs within SWD boundaries.
-* Spike-wave-complex (SWC) phase is obtained by Hilbert transform of the EEG
-  bandpass-filtered with a Butterworth filter whose **passband is centred +/-2 Hz
-  and stopband +/-4 Hz** around the SWD oscillation frequency (~4 Hz human-like
-  or ~7 Hz rodent-like), passband ripple and stopband attenuation as in the paper.
-* Interictal periods are the complement of SWDs.
-* `edgeOverlap=False` (the MATLAB default) unmarks SWDs and interictal periods
-  that overlap the start or end of the record.
+    "SWD detection algorithm works first by detecting the filtered EEG signal
+    baseline. Negative spikes exceeding 1 and 1.96 standard deviation of the EEG
+    signal relative to the baseline and spaced by at least 1 cycle distance from
+    each other are then marked. Lone spikes separated by at least 3 seconds are
+    eliminated. Groupings of spikes smaller than 1.5 seconds are also eliminated.
+    The next step is to find individual large (> 1.96 SD relative to baseline)
+    spike clusters that have durations of at least 3 seconds. Smaller clusters
+    are eliminated. The remaining clusters are marked as individual SWDs. Spikes
+    identified in earlier stages are then associated with SWDs. Phase of SWCs is
+    also estimated, as well as SWC number. The same procedure is repeated for
+    SWDs that include only spikes exceeding 1.96 standard deviations."
+
+Points the port must get right, and which an earlier draft of this module had
+wrong:
+
+* **Spikes are NEGATIVE deflections.** Detection is on downward excursions.
+* **There are TWO thresholds, not one** -- 1 SD and 1.96 SD. The 1.96 SD set
+  defines the "large" variant returned alongside every primary output; the 1 SD
+  set participates in the initial marking.
+* **Minimum SWD duration is 3 s** (`minSWD = 3` in the source).
+* Three distinct elimination rules apply, in order: spikes closer than one cycle
+  are merged; lone spikes separated by >= 3 s are dropped; spike groupings
+  shorter than 1.5 s are dropped; then clusters shorter than `minSWD` are dropped.
+* The baseline is obtained by fitting a Gaussian to the voltage histogram, not by
+  taking the mean.
+* SWC phase comes from a Butterworth bandpass with passband +/-2 Hz and stopband
+  +/-4 Hz around the SWD frequency (~4 Hz human-like or ~7 Hz rodent-like).
+* `edgeOverlap=False` is the MATLAB default, but every caller inside the authors'
+  own analysis scripts passes `True`. Support both; default to False to match the
+  function, and state the choice explicitly at each call site.
+
+Only four Signal Processing Toolbox functions are used -- `butter`, `filtfilt`,
+`filter`, `findpeaks` -- each with a direct `scipy.signal` equivalent. Note that
+`scipy.signal.find_peaks` differs from MATLAB `findpeaks` in plateau handling, so
+plateau cases must be checked against the reference rather than assumed.
 """
 from dataclasses import dataclass, field
 from typing import Optional
@@ -110,10 +132,16 @@ def evoked_swd_probability(results, n_trials=None):
     raise NotImplementedError
 
 
-def validate_against_matlab(eeg, dt_ms, matlab_output_path, tol_samples=1):
+def validate_against_matlab(matlab_output_path="swd_reference.mat", tol_samples=1):
     """Acceptance contract for criterion C6.1.
 
-    Compares this port against saved MATLAB output on an identical trace. The
+    Compares this port against `swd_reference.mat`, produced by running
+    `analysis/matlab_reference/make_reference.m` in MATLAB (see that folder's
+    README). The reference carries eight deterministic traces -- generated with
+    `rng(42,'twister')` so this module can regenerate them identically -- each
+    pinning a documented behaviour: baseline detection, the 3 s minimum, the two
+    SD thresholds, both `edgeOverlap` settings, `dt = 0.25 ms`, and the ~7 Hz
+    rodent-like regime. The
     port passes when, for the same input:
 
     * every spike index matches within ``tol_samples``;
