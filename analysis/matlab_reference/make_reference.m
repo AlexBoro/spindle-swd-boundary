@@ -7,7 +7,8 @@
 %   2. >> make_reference
 %   3. Send back the file swd_reference.mat that it writes here.
 %
-% Needs the Signal Processing Toolbox (butter, filtfilt, findpeaks, gausswin).
+% Needs the Signal Processing Toolbox (butter, filtfilt, findpeaks, gausswin)
+% and swd_trace.m, which must be on the path (it ships alongside this file).
 % detectEEGspikesSWDs.m sets showFigs = false internally, so nothing is plotted.
 % Runs in well under a minute.
 
@@ -123,22 +124,8 @@ save('swd_reference.mat', 'reference', 'reference_meta', '-v7');
 info = dir('swd_reference.mat');
 fprintf('\nWrote swd_reference.mat (%.1f MB). Send this file back.\n', info.bytes / 1e6);
 
-
-% ---- local functions (MATLAB requires these at the END of a script) -------
-function x = swd_trace(dur_s, dt_ms, episodes, spike_hz, amp_sd, noise_sd)
-    % Negative spike-and-wave episodes on a noisy baseline. The detector looks
-    % for NEGATIVE deflections past 1 and 1.96 SD of the baseline.
-    fs = 1000 / dt_ms;
-    n  = round(dur_s * fs);
-    x  = noise_sd * randn(1, n);
-    for e = 1:size(episodes, 1)
-        i0 = max(1, round(episodes(e,1) * fs) + 1);
-        i1 = min(round(episodes(e,2) * fs), n);
-        tt = (i0:i1) / fs;
-        wave = 0.4 * amp_sd(e) * sin(2*pi*spike_hz*tt);
-        spk  = zeros(1, numel(tt));
-        spk(1:round(fs / spike_hz):end) = -amp_sd(e);
-        spk  = conv(spk, gausswin(max(3, round(0.004*fs))), 'same');
-        x(i0:i1) = x(i0:i1) + wave + spk;
-    end
+% If running under tools/matlab_bridge, also drop a copy where the bridge
+% returns it automatically.
+if exist('JOB_OUT_DIR', 'var')
+    copyfile('swd_reference.mat', fullfile(JOB_OUT_DIR, 'swd_reference.mat'));
 end

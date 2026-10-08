@@ -10,3 +10,10 @@ x86_64/
 runs/
 out/
 .ipynb_checkpoints/
+tools/matlab_bridge/jobs/in/*
+tools/matlab_bridge/jobs/out/*
+tools/matlab_bridge/jobs/done/*
+tools/matlab_bridge/logs/*
+tools/matlab_bridge/bridge_alive.txt
+!tools/matlab_bridge/jobs/*/.gitkeep
+!tools/matlab_bridge/logs/.gitkeep
