@@ -3,11 +3,44 @@
 What a trustworthy run of this model requires, and why. Everything here was
 established against the deposit as vendored, on NEURON 7.8.2.
 
-## The cold-start transient
+## What the 20 s run actually showed
 
-**A short run of this model does not measure its steady state.** The first real
-run — 20 s, `spindles_long`, `saveData = 50`, seed 0, run id `68eb4d34f3a325a8` —
-produced a network that was dead by 8.5 s:
+**Correction.** An earlier version of this document diagnosed the 20 s run as a
+cold-start transient in which the network died. The first half of that is right
+and the second is wrong. A 60 s run (`14e4782842b132e0`, `saveData = 20`, 5237.5 s
+wall) shows the network **does not die — it cycles**:
+
+| | epoch 1 | gap | epoch 2 | gap | epoch 3 |
+|---|---|---|---|---|---|
+| time | 0.0–5.6 s | 21.4 s | 27.0–33.6 s | 19.5 s | 53.1–60.0 s |
+| peak cortical rate | 87.1 Hz | — | 36.5 Hz | — | 34.6 Hz |
+| peak NRT_FO rate | 110 Hz | — | 76 Hz | — | 81 Hz |
+| spindle-band peak (Welch) | 8.30 Hz | — | 8.79 Hz | — | 8.79 Hz |
+
+Activity arrives in epochs of 6–7 s separated by ~20 s of complete network
+silence, with an autocorrelation period of **27.93 s (0.0358 Hz)**. The 20 s
+window happened to contain exactly one epoch plus one gap, which is why it looked
+terminal. Duty cycle is 31.8%.
+
+Two things follow. First, **the warm-up is one full cycle, not a few seconds**:
+epoch 1 is visibly the cold start (peak rates 2.4–2.5× those of later epochs, a
+broad spectrum peaking at 5.4 Hz rather than in the spindle band), while epochs 2
+and 3 agree closely on rate and to 0.01 Hz on frequency. Discard the first ~28 s.
+Epoch 3 is right-censored at `tstop`, so its duration is a lower bound and the
+case for stationarity rests on one complete post-transient cycle.
+
+Second, **the active epochs look spindle-like and the gaps do not look like
+sleep.** Within epochs 2 and 3 the cortical population rate peaks at 8.79 Hz,
+inside criterion C2.1's 7–14 Hz window. But ~20 s of *complete* silence — zero
+spikes across all 900 cells — is not NREM: infra-slow modulation of spindle
+occurrence in real sleep rides on continuous background activity. Whether longer
+runs fill the gaps in is an open Gate 0 question, and it is the reason the
+authors' 1200 s default matters.
+
+### The mechanism, which still holds
+
+The thalamic account below was derived from the 20 s run and survives: it is what
+drives the cycle, rather than what killed the network.
 
 | window | NRT_FO rate | TC_FO rate | cortex (L5) rate |
 |---|---|---|---|
@@ -28,23 +61,24 @@ T-current cannot de-inactivate and Na⁺ channels are largely inactivated, so th
 thalamus stops firing. Cortex, deprived of thalamic drive, settles at −73 to
 −77 mV with no synaptic input at all (|iGlu| < 3e-15 after 12 s).
 
-This is a transient, not a failure. NRT is already repolarising when the
-recording ends — from −50.4 mV at 6–8 s to −60.7 mV at 18–20 s. A linear fit to
-the 2 s window means over 8–20 s gives **0.887 mV/s** (r = −0.9994), which is the
-slow `k4` unbinding limb doing its work. Extrapolating that rate linearly, NRT
-would reach −70 mV at about 29 s; the true approach is presumably exponential and
-so slower than that, which makes 29 s a lower bound rather than an estimate. The
-60 s diagnostic below is what actually settles it.
+The silence is the trough of the cycle, not an endpoint. NRT repolarises
+throughout it — from −50.4 mV at 6–8 s to −60.7 mV at 18–20 s, a linear fit over
+8–20 s giving **0.887 mV/s** (r = −0.9994) — which is the slow `k4` unbinding limb
+recovering the T-current from inactivation. In the 60 s run NRT reaches −67 mV by
+26 s and the next epoch starts at 27 s, so the cycle period is set by how long
+that unbinding takes.
 
-The authors never encounter this: the deposit ships `tstop = 1200e3`, so their
-analysis window is sixty times longer than the transient and begins long after
-it has resolved.
+The authors never see the silence as pathology: the deposit ships
+`tstop = 1200e3`, forty-odd cycles, so the gaps are just structure in a long
+recording.
 
-**Consequence for Gate 0.** No measurement from the first 20 s of a cold start
-counts. The 10.468 Hz spectral peak, the firing rates, and the three "spindle
-events" found in that run all describe the transient and have been withdrawn.
-A warm-up period must be discarded from every run, and its length must be
-measured rather than assumed — see the open question below.
+**Consequence for Gate 0.** No measurement from the first cycle counts. The
+10.468 Hz spectral peak, the firing rates, and the three "spindle events"
+reported from the 20 s run are withdrawn — that window held one cold-start epoch
+and one gap. Every run must discard a full warm-up cycle (~28 s at these
+settings) and that length must be re-measured whenever a conductance moves, since
+the cycle period is itself a function of the thalamic parameters this project
+sweeps.
 
 ## Settings that are not free parameters
 
@@ -98,21 +132,38 @@ run record carries `ok` and `failures`, and the runner exits 1 when any fire.
 
 Serial, one run per core, measured on the local machine (6 cores, 16 GB):
 
-| configuration | core-seconds per model-second |
-|---|---|
-| `saveData = 0` (no traces) | 62.7 |
-| `saveData = 50` (Vm + AMPA/NMDA + GABAa/GABAb) | 87.1 |
+| run | model time | `saveData` | wall | core-s per model-s |
+|---|---|---|---|---|
+| smoke | 2 s | 0 (no traces) | 125.4 s | 62.7 |
+| `68eb4d34f3a325a8` | 20 s | 50 (Vm + currents) | 1742.3 s | 87.1 |
+| `14e4782842b132e0` | 60 s | 20 (Vm only) | 5237.5 s | 87.3 |
 
-Peak RSS 315 MB per run. `saveData = 50` writes 75 MB per model-second across
-900 files; the 20 s baseline produced 1.62 GB. The I/O premium is about 39%.
+**Use 87 core-seconds per model-second.** An earlier version of this table
+inferred a "39% I/O premium" from the gap between the 2 s and 20 s runs and
+attributed it to `saveData`. The 60 s run refutes that: dropping from
+`saveData = 50` to `saveData = 20` — from three recorded rows per cortical cell
+to one — changed the rate by 0.2%, from 87.1 to 87.3. The cost is CPU-bound, and
+the 62.7 figure from the 2 s smoke run is not representative of anything longer.
 
-Any sweep budget must use the `saveData = 50` figure for runs that need an EEG,
-and must include the discarded warm-up in the per-point cost.
+Peak RSS 315 MB per run. Output is 75 MB per model-second at `saveData = 50`
+(1.62 GB for 20 s) and 32 MB per model-second at `saveData = 20` (1.92 GB for
+60 s) — so trace volume, not run time, is what `saveData` controls.
 
-## Open question: how long is the warm-up?
+A sweep budget must include the discarded warm-up cycle in the per-point cost. At
+~28 s of warm-up plus a usable window, no point costs less than about 1.4
+core-hours even before the analysis window is chosen.
 
-Being measured now: a 60 s `spindles_long` run at `saveData = 20` (Vm only),
-config `sim/configs/diag_spindles_60s.json`. The question it answers is whether
-the thalamus repolarises and the network resumes firing on the `k4` limb, and if
-so when. Until that number exists, no production run length can be chosen and
-no Gate 0 criterion can be scored.
+## Open question: do the gaps fill in?
+
+Settled by the 60 s run: the warm-up is one cycle, ~28 s. Still open is whether
+the ~20 s of complete network silence between spindle epochs persists over the
+authors' 1200 s, or whether background activity develops and the infra-slow
+rhythm becomes a modulation of spindle *density* rather than an all-or-none
+alternation. The second would match sleep physiology; the first would not, and
+would make "spindle density" criteria meaningless at these settings.
+
+This matters beyond Gate 0. The cycle period is a thalamic time constant, so any
+conductance this project sweeps can move it — and a boundary coordinate measured
+over a fixed window would then be comparing different fractions of a cycle at
+different parameter points. The warm-up and analysis windows must be defined
+relative to the measured cycle, not in absolute seconds.
