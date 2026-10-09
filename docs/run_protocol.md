@@ -29,9 +29,12 @@ thalamus stops firing. Cortex, deprived of thalamic drive, settles at −73 to
 −77 mV with no synaptic input at all (|iGlu| < 3e-15 after 12 s).
 
 This is a transient, not a failure. NRT is already repolarising when the
-recording ends — from −50.4 mV at 6–8 s to −60.7 mV at 18–20 s, about 1.2 mV per
-2 s — which is the slow `k4` unbinding limb doing its work. Extrapolated, NRT
-reaches rest somewhere around 35–45 s.
+recording ends — from −50.4 mV at 6–8 s to −60.7 mV at 18–20 s. A linear fit to
+the 2 s window means over 8–20 s gives **0.887 mV/s** (r = −0.9994), which is the
+slow `k4` unbinding limb doing its work. Extrapolating that rate linearly, NRT
+would reach −70 mV at about 29 s; the true approach is presumably exponential and
+so slower than that, which makes 29 s a lower bound rather than an estimate. The
+60 s diagnostic below is what actually settles it.
 
 The authors never encounter this: the deposit ships `tstop = 1200e3`, so their
 analysis window is sixty times longer than the transient and begins long after
