@@ -17,3 +17,8 @@ tools/matlab_bridge/logs/*
 tools/matlab_bridge/bridge_alive.txt
 !tools/matlab_bridge/jobs/*/.gitkeep
 !tools/matlab_bridge/logs/.gitkeep
+
+# commonlib helpers are fetched, not vendored (no licence upstream)
+tools/matlab_bridge/lib/designFilterBP.m
+tools/matlab_bridge/lib/hilbertTransform.m
+tools/matlab_bridge/lib/recentrePhase.m
