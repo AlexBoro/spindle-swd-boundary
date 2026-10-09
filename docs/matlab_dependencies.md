@@ -1,6 +1,6 @@
 # MATLAB dependencies of the SWD detector
 
-**The deposited detector cannot be run as deposited.** `detectEEGspikesSWDs.m`
+**The deposited detector cannot be run as deposited.** (All dependencies are now satisfied locally — this section records what was missing and how it was resolved.) `detectEEGspikesSWDs.m`
 depends on four helper functions that are not in either Zenodo deposit, plus a
 MATLAB toolbox. This was found by running it, not by reading it — the call sites
 are scattered and three of the four are reached only partway through the
@@ -17,7 +17,7 @@ function.
 | **`designFilterBP`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
 | **`hilbertTransform`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
 | **`recentrePhase`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
-| **`fit(..., 'gauss1')`** | Curve Fitting Toolbox | **toolbox not installed** |
+| `fit(..., 'gauss1')` | Curve Fitting Toolbox | resolved — installed (25.2, R2025b) |
 
 The three `commonlib` functions are small and self-contained, with no further
 dependencies beyond MATLAB and Signal Processing:
@@ -59,11 +59,17 @@ baseline:
 f = fit(centres.', voltageValues.', 'gauss1');
 ```
 
-This needs the Curve Fitting Toolbox. On this machine it is **licensed but not
-installed** — `license('test','Curve_Fitting_Toolbox')` returns 1, while `ver`
-does not list it and the `cfit` class is absent, so `which('fit')` resolves only
-to the unrelated `@gmdistribution/fit` method. Install it from MATLAB's Add-On
-Explorer (**Home → Add-Ons → Get Add-Ons → Curve Fitting Toolbox**).
+This needs the Curve Fitting Toolbox. **Resolved** — it is installed (version
+25.2, R2025b) and `which('fit')` now resolves to
+`...\toolbox\curvefit\curvefit\fit.m`. The reference in
+`analysis/matlab_reference/swd_reference.mat` was generated with it.
+
+It had been licensed but *not installed*: `license('test','Curve_Fitting_Toolbox')`
+returned 1 while `ver` omitted it and the `cfit` class was absent, so `which('fit')`
+resolved only to the unrelated `@gmdistribution/fit` method. Recorded because the
+licensed-but-absent combination is confusing to diagnose, and anyone setting up a
+fresh machine will meet it again — install from **Home → Add-Ons → Get Add-Ons →
+Curve Fitting Toolbox**.
 
 Substituting a hand-rolled Gaussian fit would defeat the purpose of criterion
 C6.1, which exists precisely to compare against the authors' actual behaviour.
