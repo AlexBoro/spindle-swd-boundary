@@ -271,3 +271,34 @@ def osc_freq(eeg, dt_ms, kind):
     sub, foi = pdb[m], f[m]
     i = int(_np.argmax(sub))
     return foi[i], sub[i]
+
+
+def eliminate_pks(t_pks, pks, pks_locs, distance):
+    """Port of the local ``eliminatePks`` in ``detectEEGspikesSWDs.m``.
+
+    Drops peaks that are further than ``distance`` from BOTH neighbours -- the
+    detector's way of keeping only spikes that occur in runs. ``t_pks`` is in
+    seconds and ``distance`` is ``1.5 * cycle / 1000``, also seconds.
+
+    The MATLAB original indexes ``tPks(peak+1)`` on the first iteration without
+    guarding the length, so a single-peak input raises there. That case is
+    treated here as "nothing to compare against, keep it", which is the only
+    sane reading; it cannot be validated against the reference because no
+    reference case produces exactly one peak.
+    """
+    import numpy as _np
+    t = _np.asarray(t_pks, float).ravel()
+    n = t.size
+    if n <= 1:
+        return (_np.asarray(t_pks).ravel(), _np.asarray(pks).ravel(),
+                _np.asarray(pks_locs).ravel())
+    gap_prev = _np.empty(n); gap_next = _np.empty(n)
+    gap_prev[1:] = t[1:] - t[:-1]; gap_prev[0] = _np.inf
+    gap_next[:-1] = t[1:] - t[:-1]; gap_next[-1] = _np.inf
+    # First and last peaks are judged on their one real neighbour only.
+    keep = ~(((gap_prev > distance) | ~_np.isfinite(gap_prev))
+             & ((gap_next > distance) | ~_np.isfinite(gap_next)))
+    keep[0] = not (gap_next[0] > distance)
+    keep[-1] = not (gap_prev[-1] > distance)
+    return (t[keep], _np.asarray(pks).ravel()[keep],
+            _np.asarray(pks_locs).ravel()[keep])
