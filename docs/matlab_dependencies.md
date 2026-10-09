@@ -153,3 +153,61 @@ sdEEGfilt  = std(EEGfiltBP)
 Spikes are `findpeaks` on `abs(EEGfiltBP)` after zeroing everything at or above
 the threshold, with `MinPeakDistance = ceil(cycle/2/dt)`. The `c1` of the
 Gaussian fit is computed but **not** used for the thresholds.
+
+
+### 3. The spike thresholds use a hardcoded standard deviation
+
+`detectEEGspikesSWDs.m` lines 125–127:
+
+```matlab
+sdEEG = std(EEG);
+%sdEEGfilt = std(EEGfiltBP);
+sdEEGfilt = 1.28074765136489;
+```
+
+The data-derived line is **commented out**. `sdEEGfilt` is assigned exactly once,
+to that constant, and `sdEEG` is computed but never used anywhere in the file.
+All three detection thresholds are therefore **fixed absolute offsets** from the
+fitted baseline, not multiples of the signal's own variability:
+
+| nominal | actual threshold |
+|---|---|
+| 1 SD | baseline − 1.280748 |
+| 1.96 SD | baseline − 2.510219 |
+| 2.576 SD | baseline − 3.298987 |
+
+The function's own docstring still describes them as "exceeding 1 and 1.96
+standard deviation of the EEG signal", so the documented behaviour and the
+implemented behaviour differ.
+
+**The detector is not scale-invariant.** The constant is presumably tuned to the
+amplitude of the authors' own EEG proxy. Applied to a signal of different
+amplitude — a different EEG estimator, different units, or simply a network whose
+output has grown — the thresholds mean something else entirely. This also
+explains why no synthetic trace in the reference produced "large" spikes: their
+amplitudes were scaled to the noise SD rather than to the authors' absolute
+units.
+
+#### Why this matters for the project, not just for the port
+
+Phase 3 measures evoked-SWD susceptibility across conductance sweeps, and the
+boundary coordinate `d` derived from it underpins H1b and H1c. But EEG amplitude
+is itself a function of the swept parameter: supplementary Tables S1/S2 report
+mean spike-to-wave amplitudes from **3.02 to 8.45 µV**, a factor of 2.8, across
+the published pathology routes. With a fixed threshold, detection sensitivity
+therefore varies systematically with the very parameter being swept. A boundary
+measured this way would partly reflect amplitude drift rather than a change in
+dynamical regime.
+
+Planned handling, to be carried into the Phase 3 design:
+
+1. **Port it faithfully**, constant included, so criterion C6.1 compares like with
+   like against the authors' behaviour.
+2. **Add a scale-adaptive variant** that restores the commented-out
+   `std(EEGfiltBP)`, as a switch rather than a replacement.
+3. **Run the boundary calibration both ways and report the difference.** If `p*`
+   is materially different between them, the fixed-threshold boundary cannot be
+   used for H1b/H1c; if it is not, that is a robustness result worth stating.
+
+This is also worth raising with the authors — it may be a debugging line left in,
+in which case the published SWD statistics were produced with it.

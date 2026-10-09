@@ -1,0 +1,6 @@
+{
+  "description": "Gate 0 baseline, spindle state, 20 s. First real run: provides a model EEG for criteria C2.1-C2.6 and a realistic trace to exercise the detector's Large pathway (untested by the synthetic reference).",
+  "init": {"state": "spindles_long", "tstop": 20000, "saveData": 50,
+           "dt": 0.25, "modelType": 20, "runMode": 0},
+  "conductances": {}
+}

@@ -41,10 +41,15 @@ wrong:
 * ``fmax`` comes from ``oscFreq(EEGfilt, dt, 'SWDs_human')`` -- hardcoded to the
   3-6 Hz band, so a genuine ~7 Hz rodent SWD is mis-measured and then missed
   entirely. Reproduce this faithfully, but do not use it for the ~7 Hz route.
-* Thresholds are ``baseline - k*std(EEGfiltBP)`` for k = 1, 1.96 (norminv .975)
-  and 2.576 (norminv .995), where ``baseline`` is ``b1`` of a ``gauss1`` fit to a
-  1000-bin histogram of the filtered signal. Note ``c1`` of that fit is NOT used
-  for the thresholds.
+* Thresholds are ``baseline - k*SD_CONST`` for k = 1, 1.96 (norminv .975) and
+  2.576 (norminv .995), where ``baseline`` is ``b1`` of a ``gauss1`` fit to a
+  histogram of the filtered signal binned at 0.0001 over
+  ``[floor(min), ceil(max)]``. ``c1`` of that fit is NOT used.
+* **``SD_CONST`` is hardcoded in the source**, not computed:
+  ``sdEEGfilt = 1.28074765136489`` (line 127), with ``std(EEGfiltBP)`` commented
+  out on the line above. The detector is therefore NOT scale-invariant. Port it
+  faithfully for C6.1, but expose ``adaptive_sd=True`` to restore the computed
+  value, because the sweep needs it -- see docs/matlab_dependencies.md section 3.
 * `edgeOverlap=False` is the MATLAB default, but every caller inside the authors'
   own analysis scripts passes `True`. Support both; default to False to match the
   function, and state the choice explicitly at each call site.
@@ -61,6 +66,9 @@ import numpy as np
 
 LARGE_SPIKE_SD = 1.96
 BAND_OFFSETS_HZ = (-0.75, -0.5, 0.0, 0.5, 0.75)   # from the source, not the paper
+SD_CONST = 1.28074765136489        # hardcoded in detectEEGspikesSWDs.m line 127
+HIST_BIN_WIDTH = 0.0001            # histcounts edge spacing
+MIN_SWD_S = 3.0
 PASSBAND_RIPPLE = 0.5
 STOPBAND_ATTENUATION = 16
 
