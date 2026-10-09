@@ -34,8 +34,17 @@ wrong:
   shorter than 1.5 s are dropped; then clusters shorter than `minSWD` are dropped.
 * The baseline is obtained by fitting a Gaussian to the voltage histogram, not by
   taking the mean.
-* SWC phase comes from a Butterworth bandpass with passband +/-2 Hz and stopband
-  +/-4 Hz around the SWD frequency (~4 Hz human-like or ~7 Hz rodent-like).
+* The bandpass is built as ``fmax + [-0.75 -0.5 0 0.5 0.75]`` passed as a COLUMN
+  to ``designFilterBP(Fpass, 16, 0.5, 16, 1000/dt)`` -- i.e. passband +/-0.5 Hz,
+  stopband +/-0.75 Hz, ripple 0.5, attenuation 16. **The paper's '+/-2 Hz
+  passband, +/-4 Hz stopband' does not match the code.** Follow the code.
+* ``fmax`` comes from ``oscFreq(EEGfilt, dt, 'SWDs_human')`` -- hardcoded to the
+  3-6 Hz band, so a genuine ~7 Hz rodent SWD is mis-measured and then missed
+  entirely. Reproduce this faithfully, but do not use it for the ~7 Hz route.
+* Thresholds are ``baseline - k*std(EEGfiltBP)`` for k = 1, 1.96 (norminv .975)
+  and 2.576 (norminv .995), where ``baseline`` is ``b1`` of a ``gauss1`` fit to a
+  1000-bin histogram of the filtered signal. Note ``c1`` of that fit is NOT used
+  for the thresholds.
 * `edgeOverlap=False` is the MATLAB default, but every caller inside the authors'
   own analysis scripts passes `True`. Support both; default to False to match the
   function, and state the choice explicitly at each call site.
@@ -51,8 +60,9 @@ from typing import Optional
 import numpy as np
 
 LARGE_SPIKE_SD = 1.96
-PASSBAND_HZ = 2.0
-STOPBAND_HZ = 4.0
+BAND_OFFSETS_HZ = (-0.75, -0.5, 0.0, 0.5, 0.75)   # from the source, not the paper
+PASSBAND_RIPPLE = 0.5
+STOPBAND_ATTENUATION = 16
 
 
 @dataclass

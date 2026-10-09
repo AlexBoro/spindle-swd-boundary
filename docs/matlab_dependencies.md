@@ -84,3 +84,66 @@ Useful for the port, and not stated in either paper:
 line 91 to pick the filter centre, so the ~4 Hz band is assumed before the
 rodent-like ~7 Hz case is considered. The port must reproduce that, and it is
 worth checking what it implies for the 7 Hz route in criterion C4.7.
+
+## Discrepancies between the papers and the code
+
+Found by running the detector, not by reading it. In both cases the **code** is
+what produced the published results, so the code wins.
+
+### 1. Filter settings
+
+The SWD paper describes the bandpass as *"passband and stopband frequencies
+centered at ±2 Hz and ±4 Hz around the SWD oscillation frequency"*. The source
+(`detectEEGspikesSWDs.m` lines 107–110) does something quite different:
+
+```matlab
+passbandRipple = 0.5;
+stopbandAttenuation = 16;
+bandWidth = maxPowerFrequency + [-0.75 -0.5 0 0.5 0.75];
+dBP = designFilterBP(bandWidth', stopbandAttenuation, passbandRipple, stopbandAttenuation, 1000/dt);
+```
+
+Passband ±0.5 Hz and stopband ±0.75 Hz — four to five times narrower than
+described. Criterion C6.2 has been corrected. `Fpass` must be passed as a
+**column**; `designFilterBP` indexes `Fpass(1,1)`, `(2,1)`, `(4,1)`, `(5,1)`.
+
+### 2. The detector cannot measure rodent-frequency SWDs
+
+Line 91 hardcodes the human band:
+
+```matlab
+[maxPowerFrequency, ...] = oscFreq(EEGfilt, dt, 'SWDs_human');   % 3-6 Hz
+cycle = (1000/maxPowerFrequency)*1.1;
+```
+
+`cycle` sets the minimum spike spacing, so for a genuine ~7 Hz SWD it is ~19 %
+too long. Demonstrated on a synthetic 7.004 Hz trace:
+
+| call | result |
+|---|---|
+| `oscFreq(EEG, 1.0, 'SWDs_rodent')` | **7.004 Hz** (correct) |
+| `oscFreq(EEG, 1.0, 'SWDs_human')` | 5.920 Hz (clamped at the 6 Hz band edge) |
+| `detectEEGspikesSWDs(EEG, 1.0, false)` | **0 spikes, 0 SWDs** |
+
+The authors' own `coherenceAnalyses.m` also sets `type = 'SWDs_human'` (line 63).
+Consistently, every intra-SWD frequency in supplementary Tables S1/S2 lies in
+4.60–5.45 Hz — inside the human band — and the ~7 Hz rodent route is reported
+only in a figure, not the tables.
+
+**Consequence for criterion C4.7:** the ~7 Hz route cannot be assessed with this
+detector as deposited. Either pass `'SWDs_rodent'`, or measure the frequency
+outside the detector. This must be resolved before C4.7 is judged.
+
+## Threshold definitions (from the source)
+
+```
+sdEEGfilt  = std(EEGfiltBP)
+[baseline] = b1 of fit(centres', counts', 'gauss1') on a 1000-bin histogram
+1.00 SD    : baseline - sdEEGfilt
+1.96 SD    : baseline - norminv(0.975)*sdEEGfilt
+2.576 SD   : baseline - norminv(0.995)*sdEEGfilt
+```
+
+Spikes are `findpeaks` on `abs(EEGfiltBP)` after zeroing everything at or above
+the threshold, with `MinPeakDistance = ceil(cycle/2/dt)`. The `c1` of the
+Gaussian fit is computed but **not** used for the thresholds.

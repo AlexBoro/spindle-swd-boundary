@@ -120,12 +120,14 @@ reference_meta.rng_seed = 42;
 reference_meta.output_names = outNames;      % cell assigned after construction
 reference_meta.case_names = {cases.name};
 
-save('swd_reference.mat', 'reference', 'reference_meta', '-v7');
-info = dir('swd_reference.mat');
+% run() changes the current folder to the script's own directory, so write to an
+% explicit absolute path rather than relying on cwd.
+if exist('JOB_OUT_DIR', 'var')
+    outPath = fullfile(JOB_OUT_DIR, 'swd_reference.mat');
+else
+    outPath = fullfile(fileparts(mfilename('fullpath')), 'swd_reference.mat');
+end
+save(outPath, 'reference', 'reference_meta', '-v7');
+info = dir(outPath);
 fprintf('\nWrote swd_reference.mat (%.1f MB). Send this file back.\n', info.bytes / 1e6);
 
-% If running under tools/matlab_bridge, also drop a copy where the bridge
-% returns it automatically.
-if exist('JOB_OUT_DIR', 'var')
-    copyfile('swd_reference.mat', fullfile(JOB_OUT_DIR, 'swd_reference.mat'));
-end
