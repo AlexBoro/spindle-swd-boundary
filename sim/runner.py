@@ -155,6 +155,57 @@ def run_id(config, seed):
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
+#: NEURON exits 0 even when hoc raises, so a zero return code proves nothing.
+#: These are the interpreter's own error signatures, matched in stderr.
+HOC_ERROR_PATTERNS = (
+    "not enough arguments",
+    "too many arguments",
+    "undefined variable",
+    "syntax error",
+    "argument not",
+    "no such file",
+    "can't open",
+    "Segmentation",
+    "nrn_assert",
+    "doesn't exist",
+    "is not a template",
+    "optional first arg",
+)
+
+
+def check_run(proc, config, wall, n_dat):
+    """Return a list of reasons the run should not be trusted.
+
+    An empty list means the run looks sound. NEURON returns 0 after a hoc
+    error -- the thalamus-only configuration aborts in createCells() and
+    still exits 0 -- so the exit code alone cannot gate a sweep.
+    """
+    failures = []
+    if proc.returncode != 0:
+        failures.append("nonzero exit %d" % proc.returncode)
+
+    err = proc.stderr or ""
+    for pat in HOC_ERROR_PATTERNS:
+        if pat in err:
+            line = next((l.strip() for l in err.splitlines() if pat in l), pat)
+            failures.append("hoc error: %s" % line[:160])
+            break
+
+    # A run that executed should report its own elapsed time and, when asked to
+    # save, leave traces behind.
+    if "Execution time" not in (proc.stdout or ""):
+        failures.append("no 'Execution time' line -- run did not complete")
+    if config.get("init", {}).get("saveData") and n_dat == 0:
+        failures.append("saveData set but no .dat files written")
+
+    # 900 cells at 20 s took 1742 s; anything finishing in a second never ran.
+    tstop_s = float(config.get("init", {}).get("tstop", 0)) / 1000.0
+    if tstop_s > 1 and wall < tstop_s:
+        failures.append("wall %.1fs below model time %.1fs -- implausibly fast"
+                        % (wall, tstop_s))
+    return failures
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
@@ -195,6 +246,9 @@ def main(argv=None):
                           cwd=scratch, capture_output=True, text=True)
     wall = time.time() - t0
 
+    n_dat = len([f for f in os.listdir(scratch) if f.endswith(".dat")])
+    failures = check_run(proc, config, wall, n_dat)
+
     record = {
         "run_id": rid,
         "config_path": args.config,
@@ -205,6 +259,9 @@ def main(argv=None):
         "git_sha": git_sha(os.path.dirname(os.path.abspath(args.model)) or "."),
         "wall_seconds": wall,
         "exit_code": proc.returncode,
+        "ok": not failures,
+        "failures": failures,
+        "n_dat_files": n_dat,
         "stdout_tail": proc.stdout[-4000:],
         "stderr_tail": proc.stderr[-4000:],
     }
@@ -220,8 +277,9 @@ def main(argv=None):
 
     with open(os.path.join(outdir, "record.json"), "w") as fh:
         json.dump(record, fh, indent=2)
-    print("[runner] %s exit=%d wall=%.1fs" % (rid, proc.returncode, wall))
-    return proc.returncode
+    status = "ok" if not failures else "FAILED: " + "; ".join(failures)
+    print("[runner] %s exit=%d wall=%.1fs %s" % (rid, proc.returncode, wall, status))
+    return proc.returncode if not failures else 1
 
 
 if __name__ == "__main__":
