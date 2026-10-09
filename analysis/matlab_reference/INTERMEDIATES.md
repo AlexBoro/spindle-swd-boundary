@@ -47,3 +47,43 @@ estimate, the cutoff formula, or the bilinear prewarping.
 
 The transfer-function route is a dead end: at order 16 the direct form is badly
 conditioned and `filtfilt(b, a, ...)` returns NaN. Use SOS.
+
+## Resolved: `designfilt` cutoff selection
+
+`scipy.signal.buttord` is not a drop-in substitute for MATLAB's. Both return
+order 8 (bandpass order 16), but they choose the natural frequency differently:
+**MATLAB picks `Wn` to meet the stopband exactly, scipy to meet the passband.**
+
+| | lower cutoff (Hz) | upper cutoff (Hz) |
+|---|---|---|
+| MATLAB `buttord` | 3.937007693 | 5.083065030 |
+| scipy `buttord` | 3.939431 | 5.079938 |
+
+A 0.0024 Hz difference, but it shifts the filtered signal by ~5e-3 and flips
+spikes sitting near a threshold. `analysis/swd.py:matlab_buttord_bandpass`
+reproduces MATLAB's `Wn` to **0.00e+00**, after which the interior error drops
+from 5.4e-03 to 3.5e-04 and spike detection becomes exact.
+
+Note that comparing SOS matrices element-wise is meaningless here: MATLAB's own
+`butter(n, Wn)` and `designfilt` differ by 2.0 in that comparison while
+describing the same filter, because the gain is distributed across sections
+differently. Compare frequency responses or filtered output instead.
+
+## Remaining gap: `filtfilt` boundary handling
+
+With the cutoffs fixed, the port reproduces MATLAB's spike locations **exactly in
+6 of the 8 cases**, at all three thresholds. The two failures are
+`edge_overlap_false` and `edge_overlap_true` — by construction the cases with SWD
+episodes touching the record boundaries (0–6 s and 54–60 s of a 60 s record).
+
+MATLAB's `filtfilt` and `scipy.signal.sosfiltfilt` extend the signal differently
+at the ends. A scan over `padtype` ∈ {odd, even, constant} × `padlen` ∈ [0, 400]
+does not close it: interior error stays at 6.45e-02 against ~1e-3 for the
+non-edge cases. The discrepancy is confined to the boundaries — the interior is
+unaffected.
+
+Practical significance is probably limited, since `edgeOverlap` exists precisely
+to mark SWDs overlapping the record ends and the authors' own callers pass
+`true`. But it must be settled before C6.1 can be declared met. Options, in order
+of preference: replicate MATLAB's `filtfilt` initial-condition scheme directly;
+or restrict the criterion to interior spikes and state the exclusion explicitly.

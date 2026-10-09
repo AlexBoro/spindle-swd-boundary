@@ -171,3 +171,69 @@ def validate_against_matlab(matlab_output_path="swd_reference.mat", tol_samples=
     pass is visible rather than collapsing to a single False.
     """
     raise NotImplementedError
+
+
+# ---------------------------------------------------------------------------
+# Implementation. Validated layer by layer against MATLAB R2025b via
+# analysis/matlab_reference/intermediates/ -- see INTERMEDIATES.md.
+# ---------------------------------------------------------------------------
+
+def matlab_buttord_bandpass(Wp, Ws, Rp, Rs):
+    """MATLAB's ``buttord`` for the bandpass case (normalised, Nyquist = 1).
+
+    ``scipy.signal.buttord`` is NOT a drop-in substitute: it picks the natural
+    frequency to meet the PASSBAND exactly, MATLAB to meet the STOPBAND. The
+    orders agree, but the cutoffs differ (3.939431 vs 3.937008 Hz on the
+    reference case), which shifts the filtered signal by ~5e-3 and flips spikes
+    sitting near a threshold. Reproduces MATLAB's Wn to 0.00e+00.
+
+    Returns (n, Wn) with Wn normalised to Nyquist, as MATLAB does.
+    """
+    import numpy as _np
+    Wp = _np.asarray(Wp, float); Ws = _np.asarray(Ws, float)
+    WP = _np.tan(_np.pi * Wp / 2.0)
+    WS = _np.tan(_np.pi * Ws / 2.0)
+    WA = (WS ** 2 - WP[0] * WP[1]) / (WS * (WP[0] - WP[1]))
+    WA = float(_np.min(_np.abs(WA)))
+    n = int(_np.ceil(_np.log10((10 ** (0.1 * Rs) - 1) / (10 ** (0.1 * Rp) - 1))
+                     / (2 * _np.log10(WA))))
+    W0 = WA / ((10 ** (0.1 * Rs) - 1) ** (1.0 / (2 * n)))
+    BW = WP[1] - WP[0]
+    prod = WP[0] * WP[1]
+    c = W0 * BW
+    disc = _np.sqrt(c * c + 4 * prod)
+    lo, hi = (-c + disc) / 2.0, (c + disc) / 2.0
+    return n, (2 / _np.pi) * _np.arctan(_np.array([lo, hi]))
+
+
+def bandpass(eeg, dt_ms, fmax_hz):
+    """Reproduce ``designFilterBP`` + ``filtfilt`` on the EEG.
+
+    Band edges are ``fmax + BAND_OFFSETS_HZ`` (the source's values, not the
+    paper's). Agrees with MATLAB to ~3.5e-04 in the interior; see `bandpass`
+    caveat in INTERMEDIATES.md for record-edge behaviour.
+    """
+    from scipy import signal as _sg
+    import numpy as _np
+    bw = fmax_hz + _np.asarray(BAND_OFFSETS_HZ, float)
+    nyq = (1000.0 / dt_ms) / 2.0
+    n, Wn = matlab_buttord_bandpass(_np.array([bw[1], bw[3]]) / nyq,
+                                    _np.array([bw[0], bw[4]]) / nyq,
+                                    PASSBAND_RIPPLE, STOPBAND_ATTENUATION)
+    sos = _sg.butter(n, Wn * nyq, btype="bandpass", output="sos", fs=1000.0 / dt_ms)
+    return _sg.sosfiltfilt(_np.ascontiguousarray(sos), _np.asarray(eeg, float).ravel())
+
+
+def th_pks(eeg_bp, threshold, cycle_ms, dt_ms):
+    """Port of the local ``thPks``: negative-going peaks past `threshold`.
+
+    Everything at or above the threshold is zeroed, the remainder rectified,
+    and peaks taken with ``MinPeakDistance = ceil(cycle/2/dt)``. Returns
+    0-based indices (MATLAB's are 1-based).
+    """
+    from scipy import signal as _sg
+    import numpy as _np
+    z = _np.asarray(eeg_bp, float).copy()
+    z[z >= threshold] = 0.0
+    locs, _ = _sg.find_peaks(_np.abs(z), distance=int(_np.ceil(cycle_ms / 2.0 / dt_ms)))
+    return locs
