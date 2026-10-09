@@ -189,9 +189,14 @@ An earlier version of this note claimed the constant also explained why the
 reference produced no "large" spikes. **That was wrong.** The debug dumps show
 the 1.96 SD threshold *is* crossed: `three_swds` yields `pksLocs95` = 42, and
 elimination leaves all 42 (`pksLocsGrp95` = 42). The final `eegSpikesLarge*`
-outputs are nonetheless empty, so the Large arrays are emptied somewhere in the
-downstream clustering rather than at thresholding — a separate question, still
-open.
+outputs are nonetheless empty.
+
+What that rules out is thresholding and elimination: both were instrumented and
+both pass 42 spikes through. Where the arrays actually empty has **not** been
+observed — no dump covers the stages after elimination, so "somewhere in the
+downstream clustering" is inference by elimination, not a measurement, and the
+`kmeans` grouping and the `minSWD` episode filter are both still candidates.
+Instrument those stages before repeating the claim.
 
 #### Why this matters for the project, not just for the port
 

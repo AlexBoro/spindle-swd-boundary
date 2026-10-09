@@ -34,6 +34,14 @@ With MATLAB's extracted SOS, the port reproduces every spike location exactly
 designed here via `scipy.signal.buttord` + `butter`, the interior error rises
 from 3.8e-04 to 5.4e-03 and spikes near threshold flip.
 
+*Verification note.* When first written, this sentence had been checked at 1 SD
+and 1.96 SD only; the 2.576 SD count had been obtained with the port's own
+filter design, not MATLAB's SOS, and was asserted for all three. It has since
+been run properly: filtering `three_swds` with MATLAB's extracted SOS and with
+the port's own design both give exact index agreement with the reference at all
+three thresholds (76 / 42 / 5). The claim was true, but it was not tested when
+it was made.
+
 Both designs agree on order (16) and on the −3 dB band (3.9500–5.0750 Hz), but
 differ by ~0.03 dB in the passband and ~0.33 dB in the stopband — `designfilt`
 and `buttord` choose slightly different natural frequencies. Designing from the

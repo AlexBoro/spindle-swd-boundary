@@ -23,6 +23,14 @@ CONV_FACT = 1e-3 * 1e1 * 1e3         # nA->uA, cm->mm, um^-1->mm^-1
 LOWPASS_HZ = 40.0
 LOWPASS_STOP_HZ = 60.0
 
+#: Sampling follows the integration step, not a recording rate: dt = 0.25 ms
+#: gives Fs = 4000 Hz and a Nyquist of 2000 Hz. An earlier inline version of this
+#: code used 1000 Hz, which makes buttord return a normalised Wn twice as large
+#: as intended; scipy then interprets it against the true Nyquist and the cutoff
+#: lands near 95 Hz instead of 48 Hz -- a wider passband, not a narrower one.
+#: The error is invisible in the raw EEG (identical either way) and shows up only
+#: as inflated variance in the filtered trace. Derive the Nyquist from dt here.
+
 
 def build_eeg(model_dir, dt_ms=0.25, lowpass=True):
     """Return ``(eeg_raw, eeg_lowpass)`` for one run's output directory.
