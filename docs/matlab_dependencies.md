@@ -1,31 +1,50 @@
 # MATLAB dependencies of the SWD detector
 
-**The deposited detector cannot be run as deposited.** (All dependencies are now satisfied locally — this section records what was missing and how it was resolved.) `detectEEGspikesSWDs.m`
-depends on four helper functions that are not in either Zenodo deposit, plus a
-MATLAB toolbox. This was found by running it, not by reading it — the call sites
-are scattered and three of the four are reached only partway through the
-function.
+**Correction (supersedes this file's original claim).** This document previously
+stated that `detectEEGspikesSWDs.m` depends on three helper functions "absent
+from both Zenodo deposits", and the project fetched them from
+`github.com/dervinism/commonlib` on that basis. **That was wrong.** All three are
+in the deposit, in `model/thalamocortical2/dependencies/` — they arrived with the
+unmodified vendoring commit `7fa47ca`, and the deposit carries GPL-3.0, so they
+are licensed for use and redistribution.
+
+The real problem is narrower: `dependencies/` is **not on the MATLAB path** when
+`detectEEGspikesSWDs` is called from the deposit root, so the function fails with
+an undefined-function error partway through. `addpath('dependencies')` fixes it.
+That is a packaging wrinkle worth reporting to the authors, not a missing-file
+problem, and it required no fetching from elsewhere.
+
+What this invalidates: `tools/matlab_bridge/fetch_commonlib.sh` is unnecessary
+and the "do not vendor commonlib" licence analysis is moot. Two of the four
+questions drafted for the authors were dropped as a result.
+
+How the error happened, since it is the instructive part: the functions were
+found to be undefined *at runtime*, and a GitHub search located them in
+`commonlib` — a repository by the same author. Having found a plausible source,
+the deposit itself was never re-searched. A `find . -name designFilterBP.m`
+inside the vendored tree would have taken one second and prevented all of it.
 
 ## Dependency chain
 
 | Function | Where it lives | Status |
 |---|---|---|
-| `oscFreq` | the deposit | present |
-| `spectra` | the deposit | present (called *by* `oscFreq`, not directly) |
-| `ciplot` | the deposit | present (plotting only; `showFigs` is false) |
+| `oscFreq` | deposit root | present |
+| `spectra` | deposit root | present (called *by* `oscFreq`, not directly) |
+| `ciplot` | deposit root | present (plotting only; `showFigs` is false) |
 | `thPks`, `eliminatePks`, `eliminatePks2` | local functions inside `detectEEGspikesSWDs.m` | present |
-| **`designFilterBP`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
-| **`hilbertTransform`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
-| **`recentrePhase`** | `github.com/dervinism/commonlib` | **absent from the deposit** |
-| `fit(..., 'gauss1')` | Curve Fitting Toolbox | resolved — installed (25.2, R2025b) |
+| `designFilterBP` | `dependencies/designFilterBP.m` | present — needs `addpath` |
+| `hilbertTransform` | `dependencies/hilbertTransform.m` | present — needs `addpath` |
+| `recentrePhase` | `dependencies/recentrePhase.m` | present — needs `addpath` |
+| `fit(..., 'gauss1')` | Curve Fitting Toolbox | external; installed (25.2, R2025b) |
 
-The three `commonlib` functions are small and self-contained, with no further
-dependencies beyond MATLAB and Signal Processing:
+The Curve Fitting Toolbox is the only genuine external requirement, and it is not
+listed in the deposit's stated prerequisites.
+
+The three `dependencies/` functions are small and self-contained:
 
 - `designFilterBP(Fpass, Astop1, Apass, Astop2, Fs)` — a thin wrapper over
-  `designfilt('bandpassiir', ..., 'DesignMethod','butter')`. Confirms the paper's
-  filter description and shows `Fpass` is a 5-element vector
-  (stopband1, passband1, —, passband2, stopband2).
+  `designfilt('bandpassiir', ..., 'DesignMethod','butter')`. `Fpass` is a
+  5-element column (stopband1, passband1, —, passband2, stopband2).
 - `hilbertTransform(data)` — returns `[h, phase, envelope]` from MATLAB's
   `hilbert`, with `phase = angle(h)` and `envelope = abs(h)`.
 - `recentrePhase(phaseData, phaseCentre)` — wraps phase into
@@ -35,20 +54,6 @@ dependencies beyond MATLAB and Signal Processing:
 flip**, consistent with spikes being negative deflections — then
 `recentrePhase(phaseTemp, 0)`.
 
-## Licence: do not vendor commonlib
-
-`dervinism/commonlib` **has no licence file**, so it is all-rights-reserved by
-default and we have no explicit permission to redistribute it. The three files
-are therefore **not committed here**. Fetch them instead:
-
-```bash
-tools/matlab_bridge/fetch_commonlib.sh
-```
-
-which clones at the pinned commit `deb441aad510113458c604363e6465e628825f14` and copies only the three
-required files into `tools/matlab_bridge/lib/` (git-ignored). Worth asking the
-authors to add a licence — it would make their analysis pipeline properly
-redistributable.
 
 ## Curve Fitting Toolbox
 
