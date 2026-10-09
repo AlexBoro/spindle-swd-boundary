@@ -22,3 +22,6 @@ tools/matlab_bridge/bridge_alive.txt
 tools/matlab_bridge/lib/designFilterBP.m
 tools/matlab_bridge/lib/hilbertTransform.m
 tools/matlab_bridge/lib/recentrePhase.m
+
+# MATLAB intermediates are large; distributed as an artifact, regenerate via the bridge
+analysis/matlab_reference/intermediates/
