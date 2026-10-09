@@ -1,0 +1,6 @@
+{
+  "description": "Insurance against the 300 s run being cut short: 150 s is about 5 cycles, enough to test stationarity and gap-filling, and lands in roughly half the time. NEURON writes its .dat files only at the end, so a truncated run yields nothing at all.",
+  "init": {"state": "spindles_long", "tstop": 150000, "saveData": 20,
+           "dt": 0.25, "modelType": 20, "runMode": 0},
+  "conductances": {}
+}

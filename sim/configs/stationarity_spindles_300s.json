@@ -1,0 +1,6 @@
+{
+  "description": "Does the infra-slow cycle reach a steady state, and do the silent gaps fill in? 300 s is about 10 cycles at the 27.93 s period measured in run 14e4782842b132e0. saveData=20 (Vm only) since no EEG is needed to count epochs; cost is CPU-bound so this does not save time, only disk.",
+  "init": {"state": "spindles_long", "tstop": 300000, "saveData": 20,
+           "dt": 0.25, "modelType": 20, "runMode": 0},
+  "conductances": {}
+}
