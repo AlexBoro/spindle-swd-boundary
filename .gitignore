@@ -25,3 +25,8 @@ tools/matlab_bridge/lib/recentrePhase.m
 
 # MATLAB intermediates are large; distributed as an artifact, regenerate via the bridge
 analysis/matlab_reference/intermediates/
+
+# large simulation outputs
+runs/
+*.npz
+running*.log

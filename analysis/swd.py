@@ -69,6 +69,8 @@ BAND_OFFSETS_HZ = (-0.75, -0.5, 0.0, 0.5, 0.75)   # from the source, not the pap
 SD_CONST = 1.28074765136489        # hardcoded in detectEEGspikesSWDs.m line 127
 HIST_BIN_WIDTH = 0.0001            # histcounts edge spacing
 MIN_SWD_S = 3.0
+BANDS_HZ = {"spindles": (6.0, 16.0), "SWDs_human": (3.0, 6.0),
+            "SWDs_rodent": (6.0, 9.0), "delta": (1.0, 5.0), "slow": (0.0, 1.0)}
 PASSBAND_RIPPLE = 0.5
 STOPBAND_ATTENUATION = 16
 
@@ -237,3 +239,35 @@ def th_pks(eeg_bp, threshold, cycle_ms, dt_ms):
     z[z >= threshold] = 0.0
     locs, _ = _sg.find_peaks(_np.abs(z), distance=int(_np.ceil(cycle_ms / 2.0 / dt_ms)))
     return locs
+
+
+def spectra(data, dt_ms):
+    """Port of ``spectra.m``. Returns ``(f, powerDBcons)`` -- outputs 1 and 7,
+    the two that ``oscFreq`` consumes. Exact to 0.00e+00 against MATLAB."""
+    import numpy as _np
+    data = _np.asarray(data, float).ravel()
+    Fs = 1000.0 / dt_ms
+    L = data.size
+    n = 1 << (L - 1).bit_length()                 # MATLAB 2^nextpow2(L)
+    f = Fs * _np.arange(n // 2 + 1) / n
+    Y = (_np.fft.fft(data, n) / Fs)[: n // 2 + 1]
+    P1 = _np.abs(Y) ** 2
+    P1[1:-1] *= 2                                  # powerCons
+    with _np.errstate(divide="ignore"):
+        return f, 10 * _np.log10(P1)
+
+
+def osc_freq(eeg, dt_ms, kind):
+    """Port of ``oscFreq.m`` -> ``(oscillationFrequency, maxPower)``.
+
+    ``kind`` is one of BANDS_HZ. Note the detector calls this internally with
+    'SWDs_human' regardless of the actual rhythm -- see docs/matlab_dependencies.md.
+    """
+    import numpy as _np
+    eeg = _np.asarray(eeg, float).ravel()
+    f, pdb = spectra(eeg - _np.mean(eeg), dt_ms)
+    lo, hi = BANDS_HZ[kind]
+    m = (f >= lo) & (f <= hi)
+    sub, foi = pdb[m], f[m]
+    i = int(_np.argmax(sub))
+    return foi[i], sub[i]
