@@ -104,10 +104,15 @@ which cost me a little time and may be worth a line in the README. Second, the
 function needs `fit(..., 'gauss1')` from the Curve Fitting Toolbox, which is not
 mentioned in the requirements.
 
-I am happy to share anything that comes out of this: I have a Python port of
-`detectEEGspikesSWDs.m` validated function-by-function against your MATLAB (the
-spectral layer and spike detection match exactly), and a reproducible build recipe
-for the model. Both are yours if they are of any use.
+I am happy to share anything that comes out of this. I have a partial Python port
+of `detectEEGspikesSWDs.m`, validated layer by layer against your MATLAB on eight
+synthetic test traces: `spectra`/`oscFreq`, the Butterworth design and the
+elimination step agree exactly on all eight, and spike detection agrees exactly on
+six — the two exceptions are traces with episodes overlapping the start or end of
+the record, where MATLAB's `filtfilt` and scipy's `sosfiltfilt` pad the signal
+differently and a few near-threshold spikes flip. The clustering and phase stages
+are not ported yet. I also have a reproducible build recipe for the model on
+NEURON 7.8.2. Both are yours if they are of any use.
 
 With thanks for depositing the code so completely — being able to read the actual
 conductance assignments has made this project possible.
