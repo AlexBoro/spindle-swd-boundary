@@ -1,0 +1,6 @@
+{
+  "description": "Diagnostic: does the cold-start thalamic transient resolve? 60 s, Vm only (saveData=20) to cut I/O. The 20 s baseline showed thalamus depolarising into block by 6 s with NRT recovering ~1.2 mV/2 s thereafter; Ca-dependent Ih (iarg) has k2/k4 time constants of ~7/14 s.",
+  "init": {"state": "spindles_long", "tstop": 60000, "saveData": 20,
+           "dt": 0.25, "modelType": 20, "runMode": 0},
+  "conductances": {}
+}
