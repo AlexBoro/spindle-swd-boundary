@@ -183,10 +183,15 @@ implemented behaviour differ.
 **The detector is not scale-invariant.** The constant is presumably tuned to the
 amplitude of the authors' own EEG proxy. Applied to a signal of different
 amplitude — a different EEG estimator, different units, or simply a network whose
-output has grown — the thresholds mean something else entirely. This also
-explains why no synthetic trace in the reference produced "large" spikes: their
-amplitudes were scaled to the noise SD rather than to the authors' absolute
-units.
+output has grown — the thresholds mean something else entirely.
+
+An earlier version of this note claimed the constant also explained why the
+reference produced no "large" spikes. **That was wrong.** The debug dumps show
+the 1.96 SD threshold *is* crossed: `three_swds` yields `pksLocs95` = 42, and
+elimination leaves all 42 (`pksLocsGrp95` = 42). The final `eegSpikesLarge*`
+outputs are nonetheless empty, so the Large arrays are emptied somewhere in the
+downstream clustering rather than at thresholding — a separate question, still
+open.
 
 #### Why this matters for the project, not just for the port
 
