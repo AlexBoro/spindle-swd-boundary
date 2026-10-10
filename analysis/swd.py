@@ -302,3 +302,105 @@ def eliminate_pks(t_pks, pks, pks_locs, distance):
     keep[-1] = not (gap_prev[-1] > distance)
     return (t[keep], _np.asarray(pks).ravel()[keep],
             _np.asarray(pks_locs).ravel()[keep])
+
+
+def _merge_adjacent(t_grp, min_swd):
+    """Initial cluster labelling.
+
+    MATLAB calls ``kmeans(tPksGrp2', k)`` with ``k = numel(tPksGrp2)`` -- one
+    centroid per spike -- so with distinct spike times every point lands in its
+    own cluster and the call is a no-op. Only the grouping matters downstream
+    (labels are compared for equality, never used as values), so a trivial
+    1..n labelling is equivalent and avoids reproducing MATLAB's kmeans.
+    """
+    import numpy as _np
+    t = _np.asarray(t_grp, float).ravel()
+    ids = _np.arange(1, t.size + 1)
+    for i in range(t.size - 1):
+        if t[i + 1] - t[i] <= min_swd / 2.0:
+            ids[i + 1] = ids[i]
+    return ids
+
+
+def cluster_spikes(t_grp2, locs_grp2, t_grp95, cycle_ms, dt_ms, min_swd=MIN_SWD_S):
+    """Port of the clustering and cluster-rejection stage.
+
+    Returns ``(cluster_ids_reordered, keep_mask)`` over the input spikes.
+    ``tPksGrp99`` is ``tPksGrp95`` in the deposited code (line 174), so the
+    second rejection test reuses the 1.96 SD set.
+    """
+    import numpy as _np
+    t2 = _np.asarray(t_grp2, float).ravel()
+    t95 = _np.asarray(t_grp95, float).ravel()
+    ids = _merge_adjacent(t2, min_swd)
+
+    remove = _np.zeros(t2.size, bool)
+    run_needed = (min_swd * 0.25) / (cycle_ms / 1000.0)
+    for cl in _np.unique(ids):
+        sel = ids == cl
+        span = t2[sel]
+        # Test 1: the 1.96 SD spikes inside this cluster must span >= minSWD.
+        inside = t95[(t95 >= span[0]) & (t95 <= span[-1])]
+        if inside.size == 0 or inside[-1] - inside[0] + dt_ms / 1000.0 < min_swd:
+            remove[sel] = True
+            continue
+        # Test 2: same set, >= minSWD/2, plus a run of spikes closer than one cycle.
+        if inside[-1] - inside[0] + dt_ms / 1000.0 < min_swd / 2.0:
+            remove[sel] = True
+            continue
+        count = 1
+        count_max = 1
+        hit = False
+        for i in range(inside.size - 1):
+            if inside[i + 1] - inside[i] < cycle_ms / 1000.0:
+                count += 1
+            else:
+                count_max = max(count_max, count)
+                count = 1
+            if count >= run_needed or count_max >= run_needed:
+                hit = True
+                break
+        if not hit:
+            remove[sel] = True
+
+    keep = ~remove
+    kept = ids[keep]
+    reordered = _np.zeros(kept.size, int)
+    seen = []
+    for v in kept:                                  # unique(..., 'stable')
+        if v not in seen:
+            seen.append(v)
+    for rank, v in enumerate(seen, start=1):
+        reordered[kept == v] = rank
+    return reordered, keep
+
+
+def find_waves(eeg_filt, cycle_ms, dt_ms):
+    """Port of ``findpeaks(EEGfilt, 'MinPeakDistance', ceil(cycle/2/dt))``.
+
+    Returns 0-based indices of the positive peaks (the 'waves').
+    """
+    import numpy as _np
+    from scipy.signal import find_peaks
+    d = int(_np.ceil(cycle_ms / 2.0 / dt_ms))
+    locs, _ = find_peaks(_np.asarray(eeg_filt, float).ravel(), distance=max(d, 1))
+    return locs
+
+
+def mark_swds(n_samples, locs_grp2_0b, cluster_ids, wave_locs_0b):
+    """Port of the SWD demarcation loop. Returns a label vector, 0 = not in SWD.
+
+    Each cluster is extended outward to the nearest wave peak on either side,
+    or to the record boundary when there is none.
+    """
+    import numpy as _np
+    swds = _np.zeros(n_samples, int)
+    locs = _np.asarray(locs_grp2_0b, int).ravel()
+    for cl in _np.unique(cluster_ids):
+        sel = locs[cluster_ids == cl]
+        left = wave_locs_0b[wave_locs_0b < sel[0]]
+        start = 0 if left.size == 0 else int(left.max())
+        right = wave_locs_0b[wave_locs_0b > sel[-1]]
+        end = n_samples - 1 if right.size == 0 else int(right.min())
+        swds[start:end + 1] = cl
+    return swds
