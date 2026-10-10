@@ -45,9 +45,10 @@ Two independent measures agree, and neither is a tuning of the other:
 
 The frequency step is abrupt — 8.06 Hz to 4.88 Hz with nothing in between — at
 a step size of 1.5e-5 µS, 1.1 % of the parameter value. Duty cycle, by
-contrast, is graded above the boundary and reaches the published range
-(16.34–47.15 %) immediately. Intra-SWD frequency across the seven supra-
-threshold points is 4.64–5.00 Hz, inside the published 4.60–5.45 Hz.
+contrast, is graded above the boundary: the onset point itself sits at 13.7 %,
+just below the published floor of 16.34 %, and the six points above it fall
+inside the published 16.34–47.15 % range. Intra-SWD frequency across the seven
+supra-threshold points is 4.64–5.00 Hz, inside the published 4.60–5.45 Hz.
 
 The subthreshold points are not uniformly quiet: 0.001345 produces four large
 spikes with no SWD. A graded precursor below the boundary is useful — it means
