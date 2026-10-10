@@ -153,6 +153,34 @@ A sweep budget must include the discarded warm-up cycle in the per-point cost. A
 ~28 s of warm-up plus a usable window, no point costs less than about 1.4
 core-hours even before the analysis window is chosen.
 
+## Run length is memory-bounded, not just CPU-bounded
+
+NEURON pre-allocates its recording vectors at run start from `tstop/dt`, so a
+run's entire memory cost is committed in the first seconds and does not grow
+afterwards. Measured with the 150 s and 300 s runs in flight together on the
+16 GB machine: available memory sat flat at 0.40 GB for the whole run, with two
+cores busy.
+
+The scale is roughly `n_cells x (tstop/dt) x 8 bytes x (rows recorded + time)`.
+At 900 cells, `dt = 0.25` ms and `saveData = 20` that is about 4.3 GB for 150 s
+and 8.6 GB for 300 s of model time — before counting the time vector, which
+appears to be recorded per cell as well.
+
+Two consequences for the sweep, both of which bite before CPU does:
+
+- **Concurrency is limited by RAM, not cores.** Six cores cannot run six long
+  simulations on this machine. Two runs of 150–300 s already commit essentially
+  all of 16 GB. A sweep point of useful length may occupy a whole machine.
+- **There is a maximum feasible run length per machine.** Much beyond 300 s at
+  these settings will not allocate at all locally. If the infra-slow cycle
+  requires many periods to characterise, that forces either a coarser `dt`, a
+  reduced recording set, or remote hosts with more memory — and that decision
+  should be made before committing to a sweep design.
+
+This was found by watching memory during the stationarity runs rather than by
+planning, and it is the kind of constraint that would otherwise surface as an
+unexplained failed run partway through a sweep.
+
 ## Open question: do the gaps fill in?
 
 Settled by the 60 s run: the warm-up is one cycle, ~28 s. Still open is whether
