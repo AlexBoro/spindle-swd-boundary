@@ -17,6 +17,16 @@ wake.
 **Zero SWDs at all ten points.** The same detector, with the same fixed
 threshold, found SWDs at seven of ten points on the wake sweep.
 
+Read that as **no 3–6 Hz spike-wave**, not as no spike-wave: the deposited
+detector hardcodes `oscFreq(..., 'SWDs_human')`. Re-running this sweep in the
+6–9 Hz rodent band returns 1–3 "SWDs" at *every* point including the untouched
+baseline — it flags the spindle epochs themselves — and two candidate
+discriminators (harmonic ratio, absolute band power) fail to separate spindles
+from known SWDs. `sweeps/gabaa_cx_spindles/README.md` gives the numbers. The
+detector-independent part of the result is the spectrum: the dominant rhythm
+never leaves 8.4–9.3 Hz, so the abrupt step to a slower rhythm that marked the
+wake route does not happen here.
+
 | `gbase_c` (µS) | EEG peak (Hz) | SWDs | spindles/min | spindle freq (Hz) | band power | epoch duty (%) |
 |---|---|---|---|---|---|---|
 | 0.0008 *(baseline)* | 9.28 | 0 | 6.0 | 9.65 | 3.34 | 28.5 |
