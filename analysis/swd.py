@@ -505,3 +505,82 @@ def mark_swcs(n_samples, locs_grp_0b, wave_locs_0b, phase_vec):
         swcs[start:end + 1] = i + 1
         ph[start:end + 1] = phase_vec[start:end + 1]
     return swcs, ph
+
+
+def gauss1_baseline(eeg_filt_bp, bin_width=HIST_BIN_WIDTH):
+    """Port of the baseline estimate -> ``(baseline, sd_baseline, a1)``.
+
+    MATLAB fits ``gauss1`` -- ``a1*exp(-((x-b1)/c1)^2)`` -- to a histogram of the
+    band-passed signal and takes ``b1`` as the baseline. Note ``c1`` is NOT a
+    standard deviation: gauss1 has no 1/2 in the exponent, so ``c1 = sqrt(2)*sigma``.
+    The detector assigns it to ``sdBaseline`` but never uses it for a threshold,
+    so the discrepancy does not propagate -- thresholds come from ``sdEEGfilt``.
+    """
+    import numpy as _np
+    from scipy.optimize import curve_fit
+    x = _np.asarray(eeg_filt_bp, float).ravel()
+    edges = _np.arange(_np.floor(x.min()), _np.ceil(x.max()) + bin_width, bin_width)
+    counts, edges = _np.histogram(x, bins=edges)
+    centres = edges[:-1] + (edges[1] - edges[0]) / 2.0
+
+    def g1(t, a1, b1, c1):
+        return a1 * _np.exp(-(((t - b1) / c1) ** 2))
+
+    p0 = [counts.max(), centres[int(_np.argmax(counts))], _np.std(x) * _np.sqrt(2)]
+    popt, _ = curve_fit(g1, centres, counts.astype(float), p0=p0, maxfev=20000)
+    a1, b1, c1 = popt
+    return float(b1), float(abs(c1)), float(a1)
+
+
+def detect_swds(eeg, dt_ms, edge_overlap=True, adaptive_sd=False,
+                osc_type="SWDs_human"):
+    """Full detector: EEG in, SWD/interictal/spike structure out.
+
+    ``adaptive_sd`` restores ``std(EEGfiltBP)`` in place of the hardcoded
+    ``sdEEGfilt`` constant (detectEEGspikesSWDs.m line 127). The deposited code
+    uses the constant, so the default reproduces published behaviour; the switch
+    exists because the constant makes detection non-scale-invariant, which is a
+    confound for any sweep that changes EEG amplitude.
+
+    ``osc_type`` is hardcoded to 'SWDs_human' in the original, which cannot see
+    the ~7 Hz rodent route -- pass 'SWDs_rodent' for that.
+    """
+    import numpy as _np
+    from scipy.stats import norm as _norm
+
+    eeg = _np.asarray(eeg, float).ravel()
+    fmax, _ = osc_freq(eeg, dt_ms, osc_type)
+    cycle_ms = (1000.0 / fmax) * 1.1
+    bp = bandpass(eeg, dt_ms, fmax)
+    sd = float(_np.std(bp, ddof=1)) if adaptive_sd else SD_CONST
+    baseline, sd_baseline, _a1 = gauss1_baseline(bp)
+
+    ks = (1.0, float(_norm.ppf(0.975)), float(_norm.ppf(0.995)))
+    thresholds = [baseline - k * sd for k in ks]
+    locs = [th_pks(bp, t, cycle_ms, dt_ms) for t in thresholds]
+    t_pks = [l * dt_ms / 1000.0 for l in locs]
+
+    distance_s = 1.5 * cycle_ms / 1000.0
+    grp = [eliminate_pks(tp, bp[l], l, distance_s) for tp, l in zip(t_pks, locs)]
+    t_grp, _p_grp, l_grp = grp[0]
+    t_grp95, _p95, l_grp95 = grp[1]
+
+    if t_grp.size == 0 or t_grp95.size == 0:
+        zero = _np.zeros(eeg.size, int)
+        return {"fmax_hz": fmax, "cycle_ms": cycle_ms, "baseline": baseline,
+                "sd_used": sd, "swds": zero, "interictal": zero,
+                "n_swds": 0, "spike_locs": _np.array([], int),
+                "large_spike_locs": _np.array([], int)}
+
+    ids, keep = cluster_spikes(t_grp, l_grp, t_grp95, cycle_ms, dt_ms)
+    wave_locs = find_waves(eeg, cycle_ms, dt_ms)
+    swds = mark_swds(eeg.size, l_grp[keep].astype(int), ids, wave_locs)
+    inter = mark_interictal(swds)
+    if edge_overlap:
+        swds, inter = apply_edge_overlap(swds, inter)
+    return {"fmax_hz": fmax, "cycle_ms": cycle_ms, "baseline": baseline,
+            "sd_baseline": sd_baseline, "sd_used": sd,
+            "swds": swds, "interictal": inter,
+            "n_swds": int(_np.unique(swds[swds > 0]).size),
+            "spike_locs": l_grp[keep].astype(int),
+            "large_spike_locs": l_grp95.astype(int)}
