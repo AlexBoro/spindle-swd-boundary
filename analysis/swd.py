@@ -404,3 +404,50 @@ def mark_swds(n_samples, locs_grp2_0b, cluster_ids, wave_locs_0b):
         end = n_samples - 1 if right.size == 0 else int(right.min())
         swds[start:end + 1] = cl
     return swds
+
+
+def mark_interictal(swds):
+    """Port of the interictal-period loop.
+
+    Labels each gap before SWD ``cl`` with ``cl``, and the tail after the last
+    SWD with ``cl+1``. Note the MATLAB original leaks ``clOI`` out of the loop
+    to compute the tail, so with no clusters at all it would raise; the caller
+    there has already returned early in that case.
+    """
+    import numpy as _np
+    swds = _np.asarray(swds, int).ravel()
+    inter = _np.zeros(swds.size, int)
+    clusters = _np.unique(swds[swds > 0])
+    if clusters.size == 0:
+        return inter
+    last = None
+    for cl in clusters:
+        idx = _np.flatnonzero(swds == cl)
+        start = 0 if cl == clusters[0] else _np.flatnonzero(swds == cl - 1)[-1] + 1
+        end = idx[0] - 1
+        if end >= start:
+            inter[start:end + 1] = cl
+        last = idx
+    tail = last[-1] + 1
+    if tail < swds.size:
+        inter[tail:] = clusters[-1] + 1
+    return inter
+
+
+def apply_edge_overlap(swds, interictal_vec):
+    """Port of the ``edgeOverlap`` block.
+
+    Zeroes any SWD or interictal period that touches the start or end of the
+    record, since a truncated episode has no measurable duration. Returns new
+    arrays. The authors' own callers pass ``edgeOverlap = true``.
+    """
+    import numpy as _np
+    out = []
+    for v in (swds, interictal_vec):
+        a = _np.asarray(v, int).ravel().copy()
+        if a.size and a[0]:
+            a[: _np.flatnonzero(a == a[0])[-1] + 1] = 0
+        if a.size and a[-1]:
+            a[_np.flatnonzero(a == a[-1])[0]:] = 0
+        out.append(a)
+    return tuple(out)
