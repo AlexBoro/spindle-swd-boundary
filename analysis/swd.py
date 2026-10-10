@@ -108,30 +108,73 @@ class SWDResult:
     meta: dict = field(default_factory=dict)
 
 
-def detect_swds(eeg, dt_ms, edge_overlap=False, large_only=False):
-    """Detect SWDs and their constituent spikes in an EEG trace.
+def detect_swds(eeg, dt_ms, edge_overlap=True, adaptive_sd=False,
+                osc_type="SWDs_human"):
+    """Full detector: EEG in, SWD/interictal/spike structure out.
 
-    Parameters
-    ----------
-    eeg : array_like
-        EEG vector. For the model, the summed-synaptic-current proxy.
-    dt_ms : float
-        Sampling interval in ms.
-    edge_overlap : bool
-        If False (default, matching the MATLAB), SWDs and interictal periods
-        overlapping the record boundaries are unmarked.
-    large_only : bool
-        Demarcate SWDs using only spikes above LARGE_SPIKE_SD.
+    Signal routing follows the original exactly, and it is not uniform --
+    three different signals are in play:
 
-    Returns
-    -------
-    SWDResult
+      eeg          raw input
+      eeg_filt     8 Hz low-pass of eeg          (prefilter)
+      eeg_bp       narrow bandpass of *eeg*, not of eeg_filt
+
+    ``eeg_filt`` drives the frequency estimate, the wave peaks and the final
+    output spikes; ``eeg_bp`` drives the baseline histogram, the thresholds and
+    the spikes that feed clustering. Routing any stage to the wrong one leaves
+    SWD counts intact while moving every boundary.
+
+    ``adaptive_sd`` restores ``std(EEGfiltBP)`` in place of the hardcoded
+    ``sdEEGfilt`` constant (line 127); the default reproduces published
+    behaviour. ``osc_type`` is hardcoded to 'SWDs_human' in the original, which
+    cannot see the ~7 Hz rodent route.
     """
-    raise NotImplementedError(
-        "Port of detectEEGspikesSWDs.m pending -- see module docstring for the "
-        "specification and validate_against_matlab for the acceptance contract."
-    )
+    import numpy as _np
+    from scipy.stats import norm as _norm
 
+    eeg = _np.asarray(eeg, float).ravel()
+    eeg_filt = prefilter(eeg, dt_ms)
+    fmax, _ = osc_freq(eeg_filt, dt_ms, osc_type)
+    cycle_ms = (1000.0 / fmax) * 1.1
+    eeg_bp = bandpass(eeg, dt_ms, fmax)
+
+    sd = float(_np.std(eeg_bp, ddof=1)) if adaptive_sd else SD_CONST
+    baseline, sd_baseline, _a1 = gauss1_baseline(eeg_bp)
+    ks = (1.0, float(_norm.ppf(0.975)), float(_norm.ppf(0.995)))
+    thr = [baseline - k * sd for k in ks]
+
+    locs = [th_pks(eeg_bp, t, cycle_ms, dt_ms) for t in thr]
+    locs_lp = th_pks(eeg_filt, thr[0], cycle_ms, dt_ms)
+    t_pks = [l * dt_ms / 1000.0 for l in locs]
+
+    distance_s = 1.5 * cycle_ms / 1000.0
+    t_grp, _pg, l_grp = eliminate_pks(t_pks[0], eeg_bp[locs[0]], locs[0], distance_s)
+    t_grp95, _p95, l_grp95 = eliminate_pks(t_pks[1], eeg_bp[locs[1]], locs[1], distance_s)
+
+    empty = _np.zeros(eeg.size, int)
+    if t_grp.size == 0 or t_grp95.size == 0:
+        return {"fmax_hz": fmax, "cycle_ms": cycle_ms, "baseline": baseline,
+                "sd_used": sd, "swds": empty, "interictal": empty, "n_swds": 0,
+                "spike_locs": _np.array([], int), "large_spike_locs": _np.array([], int),
+                "eeg_filt": eeg_filt, "eeg_bp": eeg_bp}
+
+    ids, keep = cluster_spikes(t_grp, l_grp, t_grp95, cycle_ms, dt_ms)
+    wave_locs = find_waves(eeg_filt, cycle_ms, dt_ms)
+    swds = mark_swds(eeg.size, l_grp[keep].astype(int), ids, wave_locs)
+    inter = mark_interictal(swds)
+    if edge_overlap:
+        swds, inter = apply_edge_overlap(swds, inter)
+
+    # Output spikes come from the LOW-PASS set, masked by interictal (line 453).
+    mask = _np.zeros(eeg.size, bool)
+    mask[locs_lp] = True
+    mask[inter.astype(bool)] = False
+    return {"fmax_hz": fmax, "cycle_ms": cycle_ms, "baseline": baseline,
+            "sd_baseline": sd_baseline, "sd_used": sd, "swds": swds,
+            "interictal": inter, "n_swds": int(_np.unique(swds[swds > 0]).size),
+            "spike_locs": _np.flatnonzero(mask),
+            "large_spike_locs": l_grp95.astype(int),
+            "eeg_filt": eeg_filt, "eeg_bp": eeg_bp}
 
 def swd_frequency(result, dt_ms):
     """Mean within-SWD spike-wave frequency in Hz, per detected SWD.
