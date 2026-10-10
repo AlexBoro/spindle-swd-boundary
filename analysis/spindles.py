@@ -106,3 +106,119 @@ def score_onset_order(latencies, predicted=PREDICTED_ORDER):
         "per_epoch_spread_ms": spread,
         "n_epochs": len(next(iter(latencies.values()))),
     }
+
+
+# --- EEG spindle detection -------------------------------------------------
+#
+# The deposit has no spindle detector; the SWD paper's criteria are stated in
+# terms of frequency (7-14 Hz) and the companion paper's spindle figures are
+# qualitative. This is the conventional envelope-threshold detector (Moelle /
+# Bazhenov lineage) applied to the model EEG, written so that SWD-contaminated
+# stretches can be excluded by mask rather than by hand.
+#
+# Thresholds are expressed in SDs of the band-passed envelope computed over the
+# retained (non-SWD, non-warm-up) samples only. That is deliberately NOT the
+# deposit's convention for SWDs -- there a fixed absolute threshold is
+# load-bearing (see sweeps/gkl_tcfo/README.md) because the question is whether
+# amplitude crossed an absolute level. Here the question is whether a spindle
+# is distinguishable from its own background, so a relative threshold is the
+# right one and makes points with different overall EEG amplitude comparable.
+
+SPINDLE_THRESHOLD_SD = 1.5         # envelope threshold for the spindle core
+SPINDLE_EXTEND_SD = 1.0            # lower threshold the event is grown out to
+SPINDLE_MIN_S = 0.4
+SPINDLE_MAX_S = 3.0
+SPINDLE_MERGE_S = 0.1
+ENVELOPE_SMOOTH_S = 0.1
+
+
+def _runs(mask):
+    import numpy as np
+    m = np.asarray(mask).astype(bool).astype(np.int8)
+    d = np.diff(np.r_[0, m, 0])
+    return list(zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1)))
+
+
+def spindle_envelope(eeg, dt_ms, band_hz=SPINDLE_BAND_HZ):
+    """Band-pass the EEG into the spindle band and return the Hilbert envelope."""
+    import numpy as np
+    from scipy.signal import butter, sosfiltfilt, hilbert
+
+    fs = 1000.0 / dt_ms
+    sos = butter(4, [band_hz[0] / (fs / 2), band_hz[1] / (fs / 2)],
+                 btype="band", output="sos")
+    bp = sosfiltfilt(sos, np.asarray(eeg, float))
+    env = np.abs(hilbert(bp))
+    w = max(1, int(round(ENVELOPE_SMOOTH_S * fs)))
+    k = np.ones(w) / w
+    return bp, np.convolve(env, k, mode="same")
+
+
+def detect_spindles(eeg, dt_ms, keep=None, band_hz=SPINDLE_BAND_HZ):
+    """Envelope-threshold spindle detector.
+
+    ``keep`` is a boolean mask of samples eligible for both the threshold
+    statistics and for detection -- pass ``~swd_mask`` to measure spindling in
+    the non-seizure part of a record. Events are seeded where the smoothed
+    envelope exceeds ``SPINDLE_THRESHOLD_SD`` SDs above its mean and grown out
+    to ``SPINDLE_EXTEND_SD``, then merged, then length-gated.
+
+    Returns a dict with the event list (sample index pairs), per-event peak
+    frequency, and summary statistics. ``density_per_min`` is per minute of
+    *retained* time, so excluding SWDs does not inflate it.
+    """
+    import numpy as np
+
+    fs = 1000.0 / dt_ms
+    eeg = np.asarray(eeg, float)
+    keep = np.ones(eeg.size, bool) if keep is None else np.asarray(keep, bool)
+    bp, env = spindle_envelope(eeg, dt_ms, band_hz)
+
+    mu, sd = env[keep].mean(), env[keep].std()
+    hi = (env >= mu + SPINDLE_THRESHOLD_SD * sd) & keep
+    lo = (env >= mu + SPINDLE_EXTEND_SD * sd) & keep
+
+    # grow each core above the low threshold, within the retained mask
+    events = []
+    for a, b in _runs(hi):
+        i, j = a, b
+        while i > 0 and lo[i - 1]:
+            i -= 1
+        while j < env.size and lo[j]:
+            j += 1
+        events.append((i, j))
+
+    merged = []
+    gap = int(round(SPINDLE_MERGE_S * fs))
+    for a, b in events:
+        if merged and a - merged[-1][1] <= gap:
+            merged[-1] = (merged[-1][0], max(b, merged[-1][1]))
+        else:
+            merged.append((a, b))
+
+    lo_n, hi_n = int(SPINDLE_MIN_S * fs), int(SPINDLE_MAX_S * fs)
+    kept = [(a, b) for a, b in merged if lo_n <= b - a <= hi_n]
+
+    freqs = []
+    for a, b in kept:
+        seg = bp[a:b]
+        if seg.size < 8:
+            freqs.append(np.nan)
+            continue
+        sp = np.fft.rfft(seg * np.hanning(seg.size))
+        f = np.fft.rfftfreq(seg.size, 1.0 / fs)
+        m = (f >= band_hz[0]) & (f <= band_hz[1])
+        freqs.append(float(f[m][np.argmax(np.abs(sp[m]))]))
+
+    durs = np.array([(b - a) / fs for a, b in kept])
+    kept_s = keep.sum() / fs
+    return dict(
+        events=kept, freqs=np.array(freqs), durations_s=durs,
+        kept_s=kept_s,
+        n=len(kept),
+        density_per_min=60.0 * len(kept) / kept_s if kept_s else np.nan,
+        mean_duration_s=float(durs.mean()) if durs.size else np.nan,
+        mean_freq_hz=float(np.nanmean(freqs)) if len(freqs) else np.nan,
+        envelope_sd=float(sd), envelope_mean=float(mu),
+        band_power=float(np.mean(bp[keep] ** 2)) if keep.any() else np.nan,
+    )
