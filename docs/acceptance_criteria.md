@@ -30,10 +30,10 @@ population fires first.
 
 | ID | Criterion | Source | Status |
 |---|---|---|---|
-| C2.1 | Spindles occur in the **7–14 Hz** band | [B] | TODO |
-| C2.2 | Spindle waves appear **regularly** in the EEG with the classical waxing–waning waveform | [A] | TODO |
-| C2.3 | **Onset sequence: NRT_FO first**, followed within a few ms by TC_HO and NRT_HO, then TC_FO and cortical neurons | [A] | TODO |
-| C2.4 | The spindle **builds in thalamus before** being reflected into cortex | [A] | TODO |
+| C2.1 | Spindles occur in the **7–14 Hz** band | [B] | **PROVISIONAL PASS** — 8.91 Hz (EEG, `oscFreq` spindles band) in both post-warm-up epochs of the 60 s run; 8.79 Hz from population rate. n=2 epochs |
+| C2.2 | Spindle waves appear **regularly** in the EEG with the classical waxing–waning waveform | [A] | **PARTIAL** — waxing–waning envelope present (peak 9.23 µV); but epochs are separated by ~21 s of *flat-zero* EEG, not low-amplitude background. "Regularly" holds on the ~28 s infra-slow cycle, not as continuous NREM |
+| C2.3 | **Onset sequence: NRT_FO first**, followed within a few ms by TC_HO and NRT_HO, then TC_FO and cortical neurons | [A] | **PROVISIONAL PASS, n=2** — observed NRT_FO → NRT_HO → TC_HO → TC_FO, matching the prediction. Per-epoch spread (TC_HO ±100 ms) is as large as the gaps being ranked, so this is not yet evidence |
+| C2.4 | The spindle **builds in thalamus before** being reflected into cortex | [A] | **PARTIAL, n=2** — NRT (35–41 ms) and TC_HO (88 ms) precede most cortex, but L5_E (110 ms) precedes TC_FO (172 ms), so the separation is not clean |
 | C2.5 | First firing of a spindle cycle may alternatively originate in **TC_HO** | [A] | TODO |
 | C2.6 | Spindle sequences are **grouped by slow-oscillation up-states** | [A] | TODO |
 
@@ -68,11 +68,11 @@ columns: 6 in Table S1 (tonic inhibition of TC_FO, two routes × three levels) a
 
 | ID | Criterion | Status |
 |---|---|---|
-| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all 15 pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | TODO |
-| C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | TODO |
+| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all 15 pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | **PROVISIONAL PASS** — 4.76 Hz on the deposit's own `SWDs_long` state (60 s, Modal). Within-event measure, meaningful at n=1 |
+| C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | **PROVISIONAL, n=1** — 11.63 s, in range. A single discharge is not a mean |
 | C4.13 | Mean interictal period **19.81–48.39 s** | TODO |
-| C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | TODO |
-| C4.15 | SWD incidence **1.01–1.85 min⁻¹** | TODO |
+| C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | **WEAK, n=1** — 36.34 % over 32 s of usable record. Rests on one event; not a usable estimate |
+| C4.15 | SWD incidence **1.01–1.85 min⁻¹** | **FAIL (weak), n=1** — 1.88 min⁻¹, just above range. One event in 32 s cannot estimate a rate; re-measure on a long run |
 | C4.16 | **Leading structure is L4 in all 15 pathology columns**, without exception | TODO |
 | C4.17 | Poly-spikes present in all 15 pathology columns | TODO |
 | C4.18 | Mean spike-to-wave amplitude **3.02–8.45 µV**; mean PSI **0.52–0.82** | TODO |
@@ -188,3 +188,18 @@ amplitude varies by a factor of ~2.8 across the published pathology routes
 swept parameter. Before the boundary coordinate `d` is used for H1b or H1c, the
 calibration must be run with both the fixed and a scale-adaptive threshold and
 the two compared. See `docs/matlab_dependencies.md` §3.
+
+## Status conventions used above
+
+- **PASS** — measured, within the published range, with enough events that the
+  statistic is meaningful.
+- **PROVISIONAL PASS** — measured and within range, but on too few events (n
+  stated) for the number to be evidence. A within-event measure such as
+  frequency can be provisional at n=1; a rate or a mean cannot.
+- **PARTIAL** — the qualitative feature is present but something about it
+  departs from the published description, stated inline.
+- **WEAK / FAIL (weak)** — measured, but n is too small for the result to
+  count either way. Recorded so it is not mistaken for an untested criterion.
+
+Every provisional entry names the run it came from and the n it rests on. None
+of them closes Gate 0.
