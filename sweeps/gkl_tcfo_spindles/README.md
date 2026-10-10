@@ -1,5 +1,13 @@
 # Sweep 2 — the same conductance, from the spindle baseline
 
+> **A note on the name.** `GLUfullsyn.gbase_c` is the thalamic **K⁺ leak**,
+> not a glutamatergic conductance. `glu3.mod:84` declares it as "baseline K+
+> leak conductance" (µS) with `Erev_c = -95 mV` (E_K), and line 196 drives
+> `NONSPECIFIC_CURRENT iKLeak = (gbase_c - g_c)*(v - Erev_c)`. It sits on a
+> `GLUfullsyn` object only because that mechanism bundles AMPA (`_a`), NMDA
+> (`_b`) and a metabotropic component (`_c`) whose conductance `g_c`
+> *subtracts* from the leak.
+
 Identical protocol to `sweeps/gkl_tcfo/` (90 s, Modal, single seed, first 30 s
 discarded) with one change: `state = spindles_long` instead of `wake_long`, and
 the TC_FO `GLUfullsyn.gbase_c` swept over a much wider range — from the spindle

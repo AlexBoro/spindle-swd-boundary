@@ -1,5 +1,13 @@
 # Sweep 5 — the gate test: a spindle state with the wake Na leak
 
+> **A note on the name.** `GLUfullsyn.gbase_c` is the thalamic **K⁺ leak**,
+> not a glutamatergic conductance. `glu3.mod:84` declares it as "baseline K+
+> leak conductance" (µS) with `Erev_c = -95 mV` (E_K), and line 196 drives
+> `NONSPECIFIC_CURRENT iKLeak = (gbase_c - g_c)*(v - Erev_c)`. It sits on a
+> `GLUfullsyn` object only because that mechanism bundles AMPA (`_a`), NMDA
+> (`_b`) and a metabotropic component (`_c`) whose conductance `g_c`
+> *subtracts* from the leak.
+
 Sweeps 2 and 3 showed the spindle state reaches spike-wave on neither the
 thalamic leak axis nor the cortical GABA-A axis, and nominated TC `g_naleak` as
 the gate. `TCcell.hoc:169` gives it a nonzero value **only** for `wake_*` and

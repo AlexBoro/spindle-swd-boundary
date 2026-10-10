@@ -2,7 +2,15 @@
 
 Two axes so far, selected by the ``axis`` argument:
 
-``tc_fo_gkl``   GLUfullsyn.gbase_c in the FO branch of TCcell.hoc. This one
+``tc_fo_gkl``   GLUfullsyn.gbase_c in the FO branch of TCcell.hoc. Despite the
+                object name this is the thalamic **K+ leak**, not a
+                glutamatergic conductance: glu3.mod:84 declares gbase_c as
+                "baseline K+ leak conductance" in uS with Erev_c = -95 mV (E_K),
+                and line 196 drives NONSPECIFIC_CURRENT iKLeak =
+                (gbase_c - g_c)*(v - Erev_c). It lives on GLUfullsyn only
+                because that mechanism bundles AMPA (_a), NMDA (_b) and a
+                metabotropic component (_c) whose conductance g_c *subtracts*
+                from the leak. This one
                 needs an anchor rather than a bare value match: gbase_c is
                 assigned once per state in the FO branch and again in the HO
                 branch, and wake_short carries the same value as wake_long, so

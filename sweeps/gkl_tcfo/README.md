@@ -1,5 +1,13 @@
 # Sweep 1 — TC_FO tonic K+ conductance, wake → SWD
 
+> **A note on the name.** `GLUfullsyn.gbase_c` is the thalamic **K⁺ leak**,
+> not a glutamatergic conductance. `glu3.mod:84` declares it as "baseline K+
+> leak conductance" (µS) with `Erev_c = -95 mV` (E_K), and line 196 drives
+> `NONSPECIFIC_CURRENT iKLeak = (gbase_c - g_c)*(v - Erev_c)`. It sits on a
+> `GLUfullsyn` object only because that mechanism bundles AMPA (`_a`), NMDA
+> (`_b`) and a metabotropic component (`_c`) whose conductance `g_c`
+> *subtracts* from the leak.
+
 The project's first parameter sweep. Ten points along `GLUfullsyn.gbase_c` in
 the first-order TC branch of `TCcell.hoc`, 90 s of model time each, `state =
 wake_long`, single seed, run on Modal (image `im-MjGYjvPyiWkNx8nW9DPCBa`,
