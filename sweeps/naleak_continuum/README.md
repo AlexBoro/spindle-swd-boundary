@@ -61,10 +61,17 @@ an intermediate tone is *susceptible* — whether raising the K⁺ leak from the
 produces SWDs the way it does from wake, rather than killing the network the way
 it does at full Na leak.
 
-`sweeps/naleak_gkl_slice/` runs that: the two tones with the best surviving
-spindling in the recovered branch (2.6e-5 and 3.2e-5, both with spindle power
-above 1.5) crossed with five K⁺ leak values spanning the spindle baseline to past
+`sweeps/naleak_gkl_slice/` runs that: **all three tones in the recovered branch
+that retain spindle power above 1.5** — 2e-5 (1.845), 2.6e-5 (1.574) and 3.2e-5
+(2.170) — crossed with five K⁺ leak values spanning the spindle baseline to past
 the wake-route boundary.
+
+(The slice was first dispatched with only 2.6e-5 and 3.2e-5, described as "the
+two tones with the best surviving spindling". That was wrong: ranked by spindle
+power the recovered branch runs 3.2e-5 > 2e-5 > 2.6e-5, so the pair chosen was
+the 1st and 3rd, and 2e-5 is also the only recovered point with a detected
+active epoch. 2e-5 was added as a third row rather than substituted, so the
+slice now spans the criterion as stated instead of a subset of it.)
 
 ## Reproducing
 
