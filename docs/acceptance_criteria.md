@@ -41,7 +41,7 @@ population fires first.
 
 | ID | Criterion | Source | Status |
 |---|---|---|---|
-| C3.1 | Progressively increasing membrane hyperpolarisation moves the network desynchronised → spindles → slow (<1 Hz) → delta | [A] | TODO |
+| C3.1 | Progressively increasing membrane hyperpolarisation moves the network desynchronised → spindles → slow (<1 Hz) → delta | [A] | **STATES PASS, PROGRESSION UNTESTED** — each named state produces its named rhythm when measured *within active epochs*: wake 7.93 Hz continuous with the lowest EEG amplitude (sd 1.83 vs 4.5–5.2), spindles 8.89 Hz, slow **0.61 Hz** (<1 Hz as required), delta 2.81 Hz, SWDs 4.76 Hz. But the deposit implements each state as its own parameter set — 13 `strcmp` branch sites across `TCcell`/`NRTcell`/`Cx3cell` setting `gbase_c`, `gbar_c`, `g_pas`, `cac_iarg`, `shift_iarg` and an AHP term together — not as positions on a hyperpolarisation axis. The *progression* claim therefore cannot be tested by running the shipped states and requires a deliberate sweep of a single conductance |
 
 ## 4. Spike-and-wave discharge
 
