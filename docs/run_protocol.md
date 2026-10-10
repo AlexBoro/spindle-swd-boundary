@@ -186,10 +186,21 @@ memory during a run.
 
 ## Remote compute is faster and removes the ceiling
 
-The same 20 s run on Modal (`cpu=2`, image `im-MjGYjvPyiWkNx8nW9DPCBa`,
-Python 3.8 + NEURON 7.8.2) takes **45.3 core-seconds per model-second** against
-**87.1** locally — about 1.9x faster per core — and memory is a `provider_params`
-field rather than a wall. Local cost estimates are therefore pessimistic for
+A 20 s run on Modal (`cpu=2`, image `im-MjGYjvPyiWkNx8nW9DPCBa`, Python 3.8 +
+NEURON 7.8.2, `saveData = 20`) takes **45.3 core-seconds per model-second**.
+
+The like-for-like local comparator is the 60 s run at the same `saveData = 20`,
+which cost **87.3** — not the 20 s `saveData = 50` run at 87.1, which an earlier
+version of this section quoted as though it were the matched configuration. It
+happens not to change the answer, because the two local figures agree to 0.2%
+and that agreement is itself the evidence that `saveData` does not materially
+move CPU cost here. But the comparison as originally stated put a `saveData = 20`
+remote run against a `saveData = 50` local one and called them matched, which
+would have been a real confound had the I/O premium been as large as this
+document once claimed.
+
+So: **about 1.9x faster per core** (45.3 vs 87.3), and memory is a
+`provider_params` field rather than a wall. Local cost estimates are therefore pessimistic for
 this provider, and the practical limit on run length is a number you request,
 not a property of the machine.
 
