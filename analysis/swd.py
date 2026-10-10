@@ -584,3 +584,57 @@ def detect_swds(eeg, dt_ms, edge_overlap=True, adaptive_sd=False,
             "n_swds": int(_np.unique(swds[swds > 0]).size),
             "spike_locs": l_grp[keep].astype(int),
             "large_spike_locs": l_grp95.astype(int)}
+
+
+def matlab_buttord_lowpass(Wp, Ws, Rp, Rs):
+    """MATLAB's ``buttord`` for the lowpass case (normalised, Nyquist = 1).
+
+    Same divergence as the bandpass version: MATLAB sets the natural frequency
+    from the STOPBAND, scipy from the passband.
+    """
+    import numpy as _np
+    WP = _np.tan(_np.pi * float(Wp) / 2.0)
+    WS = _np.tan(_np.pi * float(Ws) / 2.0)
+    WA = WS / WP
+    n = int(_np.ceil(_np.log10((10 ** (0.1 * Rs) - 1) / (10 ** (0.1 * Rp) - 1))
+                     / (2 * _np.log10(WA))))
+    W0 = WA / ((10 ** (0.1 * Rs) - 1) ** (1.0 / (2 * n)))
+    return n, (2 / _np.pi) * _np.arctan(W0 * WP)
+
+
+#: The detector's own pre-filter, distinct from the EEG forward model's 40 Hz
+#: low-pass. detectEEGspikesSWDs.m lines 79-87.
+PREFILTER_PASS_HZ = 8.0
+PREFILTER_STOP_HZ = 12.0
+PREFILTER_RP_DB = 0.5
+PREFILTER_RS_DB = 10.0
+
+
+def prefilter(eeg, dt_ms):
+    """Port of the detector's ``EEGfilt = filtfilt(b, a, EEG)`` stage.
+
+    Everything downstream -- the frequency estimate, the wave peaks, the
+    spike amplitudes -- runs on this signal, not on the raw EEG. Omitting it
+    leaves SWD *counts* unchanged on the reference traces while shifting every
+    boundary by a few samples, which is exactly the kind of agreement that
+    looks like success.
+
+    NOTE: when ``filter.mat`` is on the MATLAB path the original LOADS cached
+    coefficients instead of designing them, and those are fixed while this
+    design depends on ``dt``. The deposit ships such a file, so a production run
+    from the deposit root and this port can differ at a sampling rate other than
+    whatever the cached filter was built for.
+    """
+    import numpy as _np
+    from scipy.signal import butter as _butter, filtfilt as _filtfilt
+    nyq = (1000.0 / dt_ms) / 2.0
+    n, wn = matlab_buttord_lowpass(PREFILTER_PASS_HZ / nyq, PREFILTER_STOP_HZ / nyq,
+                                   PREFILTER_RP_DB, PREFILTER_RS_DB)
+    # Transfer-function form, not SOS, and this is deliberate: at order 6 the
+    # direct form is well conditioned and matches MATLAB's filtfilt(b, a) to
+    # ~7e-08, while sosfiltfilt differs from it by 2-25% of signal amplitude.
+    # The opposite holds for the order-16 bandpass, where direct form is badly
+    # conditioned and returns NaN -- so the two stages use different forms on
+    # purpose. See docs/matlab_dependencies.md.
+    b, a = _butter(n, wn, btype="low")
+    return _filtfilt(b, a, _np.asarray(eeg, float).ravel())
