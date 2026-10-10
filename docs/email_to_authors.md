@@ -126,6 +126,23 @@ populated correctly, so SWD-level results are unaffected. It is only the
 spike-level outputs. But since I am reimplementing the function I wanted to check
 whether I am misreading it, or whether those outputs were simply never used.
 
+One more of the same kind, in `dependencies/hilbertTransform.m`:
+
+```matlab
+h = hilbert(data');
+h = h';
+```
+
+For a row-vector input the second line is a **conjugate** transpose, so the
+function returns the conjugate of the analytic signal and the phase it reports
+is sign-flipped relative to the usual convention. (`.'` would avoid it.) I only
+noticed because my port disagreed with your output by exactly a sign until I
+reproduced it — the reference matches `-angle(hilbert(x))` to 1e-15, so my
+implementation now does the same deliberately. I would expect this to cancel in
+any comparison where both signals go through the same function, which I think
+covers the phase results in the paper, but it would change the sign of an
+absolute lead/lag.
+
 ---
 
 Two notes in case they are useful to you. First, `detectEEGspikesSWDs.m` calls

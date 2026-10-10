@@ -451,3 +451,57 @@ def apply_edge_overlap(swds, interictal_vec):
             a[_np.flatnonzero(a == a[-1])[0]:] = 0
         out.append(a)
     return tuple(out)
+
+
+def hilbert_phase(data, centre=0.0):
+    """Port of ``hilbertTransform`` followed by ``recentrePhase``.
+
+    Returns the instantaneous phase of ``data`` wrapped into
+    ``[centre-pi, centre+pi]``. The detector calls this on the NEGATED
+    band-passed signal, consistent with spikes being negative deflections.
+    """
+    import numpy as _np
+    from scipy.signal import hilbert as _hilbert
+    # hilbertTransform.m does `h = hilbert(data'); h = h';` and in MATLAB `'`
+    # on a COMPLEX array is the conjugate transpose, so the helper returns the
+    # conjugate of the analytic signal and its phase is sign-flipped relative to
+    # the usual convention. Reproduced here deliberately: the reference matches
+    # -angle(hilbert(x)) to 1.3e-15, and matching their output is the point.
+    ph = -_np.angle(_hilbert(_np.asarray(data, float).ravel()))
+    # recentrePhase only moves values STRICTLY outside the limits, so a value
+    # sitting exactly on +pi stays put. A modulo would wrap it to -pi and
+    # disagree with MATLAB by 2*pi at those samples.
+    upper, lower = centre + _np.pi, centre - _np.pi
+    hi = ph > upper
+    if hi.any():
+        ph[hi] -= 2 * _np.pi * _np.ceil((ph[hi] - upper) / (2 * _np.pi))
+    lo = ph < lower
+    if lo.any():
+        ph[lo] += 2 * _np.pi * _np.ceil((lower - ph[lo]) / (2 * _np.pi))
+    return ph
+
+
+def mark_swcs(n_samples, locs_grp_0b, wave_locs_0b, phase_vec):
+    """Port of the SWC demarcation loop -> ``(swcs, phase)``.
+
+    Each spike-and-wave complex runs from the wave peak before its spike to the
+    one after. Both arrays are NaN outside any complex. The MATLAB original
+    extends only the LAST complex to include its right-hand wave peak
+    (``endSWC = min(rightWaveLocs)`` rather than ``- 1``), so complexes abut
+    without overlapping except at the final one.
+    """
+    import numpy as _np
+    swcs = _np.full(n_samples, _np.nan)
+    ph = _np.full(n_samples, _np.nan)
+    locs = _np.asarray(locs_grp_0b, int).ravel()
+    wl = _np.asarray(wave_locs_0b, int).ravel()
+    for i, loc in enumerate(locs):
+        left = wl[wl < loc]
+        right = wl[wl > loc]
+        if left.size == 0 or right.size == 0:
+            continue                       # MATLAB max([]) / min([]) give []
+        start = int(left.max())
+        end = int(right.min()) if i == locs.size - 1 else int(right.min()) - 1
+        swcs[start:end + 1] = i + 1
+        ph[start:end + 1] = phase_vec[start:end + 1]
+    return swcs, ph
