@@ -109,6 +109,27 @@ def apply_mod(name):
         s = s.replace(cond, cond[:-3] + ' || !strcmp(state,"%s")) {' % STATE, 1)
         open(fn, "w").write(s)
         return "TCcell.hoc naleak condition += %s" % STATE
+    if name.startswith("naleak="):
+        # Set the thalamic Na leak to an explicit intermediate value on a sleep
+        # background, so a second axis can be swept across it. Same patch as the
+        # tc_naleak axis; HO scaled by the wake FO:HO ratio.
+        value = float(name.split("=", 1)[1])
+        fn = "TCcell.hoc"
+        else_block = ('            } else {\n'
+                      '                g_naleak = 0\n'
+                      '            }')
+        s = open(fn).read()
+        assert s.count(else_block) == 1, ("naleak else-block matched %d times"
+                                          % s.count(else_block))
+        repl = ('            } else {\n'
+                '                if (!strcmp(section, "FO")) {\n'
+                '                    g_naleak = %r\n'
+                '                } else {\n'
+                '                    g_naleak = %r\n'
+                '                }\n'
+                '            }' % (value, value * (0.00003 / 0.000052)))
+        open(fn, "w").write(s.replace(else_block, repl, 1))
+        return "TCcell.hoc sleep naleak := %g (HO %g)" % (value, value * (0.00003 / 0.000052))
     raise SystemExit("unknown modifier %r" % name)
 
 
