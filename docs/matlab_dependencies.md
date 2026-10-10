@@ -196,12 +196,41 @@ the 1.96 SD threshold *is* crossed: `three_swds` yields `pksLocs95` = 42, and
 elimination leaves all 42 (`pksLocsGrp95` = 42). The final `eegSpikesLarge*`
 outputs are nonetheless empty.
 
-What that rules out is thresholding and elimination: both were instrumented and
-both pass 42 spikes through. Where the arrays actually empty has **not** been
-observed — no dump covers the stages after elimination, so "somewhere in the
-downstream clustering" is inference by elimination, not a measurement, and the
-`kmeans` grouping and the `minSWD` episode filter are both still candidates.
-Instrument those stages before repeating the claim.
+**Resolved — and it is not a thresholding, elimination or clustering problem.
+`pksLocsLarge` is never populated.**
+
+Line 453 builds the ordinary spike mask from the low-pass spike set, then line 455
+masks out interictal periods for both the ordinary and the large sets:
+
+```matlab
+pksLocs = false(1,numel(EEGfilt));
+pksLocs(pksLocsLP) = true;          % <- ordinary spikes get filled in here
+pksLocs(logical(interictal)) = false;
+pksLocsLarge(logical(interictal)) = false;   % <- but pksLocsLarge was never filled
+```
+
+`pksLocsLarge` has no creating assignment anywhere before line 455 (the only plain
+assignment to it is line 461, `pksLocsLarge = find(pksLocsLarge)`, which runs
+after). MATLAB therefore auto-creates it at line 455 as an all-`false` logical
+array, and lines 459–461 then read an empty set out of it. The counterpart of
+line 453 — something like `pksLocsLarge(pksLocsGrp95) = true;` — is absent.
+
+Consequence: the five spike-level outputs `eegSpikesLarge`, `eegSpikesLargeSWD`,
+`eegSpikesLargeT`, `eegSpikesLargeLocs` and `eegSpikesLargeLocsSWD` are empty for
+**every** input, regardless of amplitude. Confirmed against the authors' own
+MATLAB across all eight reference cases: `eegSpikesLarge` comes back full-length
+with exactly zero entries set, including `edge_overlap_false`/`true` which carry
+66 large spikes and `three_swds` which carries 42.
+
+**Scope.** `SWDsLarge` and `interictalLarge` are built from `pksLocsGrp95`
+directly at lines 375–448 and are unaffected — they are correctly populated. So
+SWD-level "large" results are sound; only the spike-level outputs are empty. Any
+of our analysis that wants large-spike positions should use `pksLocsGrp95`.
+
+This supersedes the earlier note here, which inferred that the arrays were
+"emptied somewhere in the downstream clustering" and named `kmeans` and the
+`minSWD` filter as candidates. The framing was wrong: they are not emptied, they
+are never filled.
 
 #### Why this matters for the project, not just for the port
 

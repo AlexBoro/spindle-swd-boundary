@@ -1,5 +1,5 @@
 **To:** Martynas Dervinis; Vincenzo Crunelli
-**Subject:** Three short questions about the thalamocortical2 code (Zenodo 7724443)
+**Subject:** Three questions about the thalamocortical2 code (Zenodo 7724443)
 
 Dear Dr Dervinis and Professor Crunelli,
 
@@ -12,10 +12,11 @@ the question needs.
 
 I have the code running (NEURON 7.8.2 — the 13 mechanisms using the older
 `nrn_random_pick` idiom don't compile on 8.2+, in case anyone else asks) and I am
-reproducing your baseline before changing anything. Three things in the code I
-cannot resolve by reading it. Each should be a one- or two-line answer, and they
-are independent — if only one is easy to answer, **the first is by far the most
-important**.
+reproducing your baseline before changing anything. Four items below: three are
+things in the code I cannot resolve by reading it, and the fourth is something I
+think I have found, reported in case it is useful to you. They are independent,
+and each should be a one- or two-line answer — if only one is easy, **the first
+is by far the most important to me**.
 
 ---
 
@@ -93,6 +94,37 @@ published numbers.
 `oscFreq(EEGfilt, dt, 'SWDs_human')` with the band hardcoded to 3–6 Hz, so the
 ~7 Hz route from the reduced TC_HO leak returns no spikes when I run it. Did you
 pass `'SWDs_rodent'` for that figure, or measure the frequency another way?
+
+### 4. I think a line may be missing around line 455 — have I misread it?
+
+This one is me reporting rather than asking, in case it is useful. The five
+`eegSpikesLarge*` outputs come back empty for every input I give the function,
+including traces with plenty of large spikes.
+
+Lines 452–455 are:
+
+```matlab
+pksLocs = false(1,numel(EEGfilt));
+pksLocs(pksLocsLP) = true;
+pksLocs(logical(interictal)) = false;
+pksLocsLarge(logical(interictal)) = false;
+```
+
+`pksLocs` is created and filled on the first two lines. `pksLocsLarge` has no
+creating assignment anywhere earlier — the next one is line 461,
+`pksLocsLarge = find(pksLocsLarge)` — so line 455 auto-creates it as an all-false
+logical array, and lines 459–461 read nothing out of it. The counterpart of line
+453, something like `pksLocsLarge(pksLocsGrp95) = true;`, does not seem to be
+there.
+
+I checked this on eight test traces: `eegSpikesLarge` returns full-length with
+zero entries set, even where `pksLocsGrp95` holds 42 or 66 spikes.
+
+As far as I can tell this does **not** touch anything published: `SWDsLarge` and
+`interictalLarge` are built from `pksLocsGrp95` directly at lines 375–448 and are
+populated correctly, so SWD-level results are unaffected. It is only the
+spike-level outputs. But since I am reimplementing the function I wanted to check
+whether I am misreading it, or whether those outputs were simply never used.
 
 ---
 
