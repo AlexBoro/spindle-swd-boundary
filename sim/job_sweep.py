@@ -1,11 +1,22 @@
-"""One sweep point: set the TC_FO thalamic K+ leak, run, reduce, return.
+"""One sweep point: set one conductance, run, reduce, return.
 
-Sweeps GLUfullsyn.gbase_c in the FO branch of TCcell.hoc, anchored on the
-wake_long assignment. Two things make the anchor necessary rather than
-cosmetic: gbase_c is assigned 11 times in the FO branch alone (one per state)
-and again in the HO branch, and wake_short carries the same value as wake_long,
-so matching on the number is ambiguous. The patch asserts it replaced exactly
-one line.
+Two axes so far, selected by the ``axis`` argument:
+
+``tc_fo_gkl``   GLUfullsyn.gbase_c in the FO branch of TCcell.hoc. This one
+                needs an anchor rather than a bare value match: gbase_c is
+                assigned once per state in the FO branch and again in the HO
+                branch, and wake_short carries the same value as wake_long, so
+                matching on the number alone is ambiguous. The anchor pins both
+                the state and the FO baseline value, which also makes the patch
+                fail loudly if upstream ever changes that baseline.
+
+``cx_gabaa``    GABAsyn.gbar_a in Cx3cell.hoc, and ``cx_ampa`` GLUsyn.gbar_a.
+                Both are assigned exactly once and are state-independent, so a
+                cortical sweep runs identically from any vigilance state.
+
+Every patch asserts it replaced exactly one line.
+
+Usage: job_sweep.py <tstop_ms> <state> <axis> <value>
 """
 import glob, json, os, re, resource, subprocess, sys, time
 
@@ -15,7 +26,8 @@ from scipy import signal
 MODEL = "thalamocortical2"
 TSTOP_MS = int(sys.argv[1])
 STATE = sys.argv[2]
-GBASE_FO = float(sys.argv[3])
+AXIS = sys.argv[3]
+VALUE = float(sys.argv[4])
 DT_MS = 0.25
 SPIKE_THRESHOLD_MV = 0.0
 LAYER_DEPTH_UM = {"2": 351.8, "4": 693.4, "5": 1089.4, "6": 1597.2}
@@ -26,23 +38,31 @@ CONV_FACT = 1e-3 * 1e1 * 1e3
 os.chdir(MODEL)
 
 # --- patch the swept conductance -------------------------------------------
-src = open("TCcell.hoc").read()
-# The FO baseline value is what disambiguates: every state has both an FO and an
-# HO arm, so matching on the state name alone hits two lines (for wake_long,
-# FO 0.001325 and HO 0.0045). Requiring the FO value makes the match unique AND
-# makes the patch fail loudly if upstream ever changes that baseline.
 FO_BASELINE = {"wake_long": "0.001325", "spindles_long": "0.0008",
                "slow_long": "0.0015", "delta_long": "0.0019",
-               "SWDs_long": "0.001395"}[STATE]
-anchor = re.compile(
-    r'(strcmp\(state,"' + re.escape(STATE) + r'"\)\)\s*\{\s*\n\s*GLUfullsyn\.gbase_c\s*=\s*)('
-    + re.escape(FO_BASELINE) + r')')
+               "SWDs_long": "0.001395"}
+
+if AXIS == "tc_fo_gkl":
+    target_file = "TCcell.hoc"
+    base = FO_BASELINE[STATE]
+    anchor = re.compile(
+        r'(strcmp\(state,"' + re.escape(STATE)
+        + r'"\)\)\s*\{\s*\n\s*GLUfullsyn\.gbase_c\s*=\s*)(' + re.escape(base) + r')')
+elif AXIS in ("cx_gabaa", "cx_ampa"):
+    target_file = "Cx3cell.hoc"
+    var, base = (("GABAsyn.gbar_a", "0.068") if AXIS == "cx_gabaa"
+                 else ("GLUsyn.gbar_a", "0.001945"))
+    anchor = re.compile(r'(' + re.escape(var) + r'\s*=\s*)(' + re.escape(base) + r')')
+else:
+    raise SystemExit("unknown axis %r" % AXIS)
+
+src = open(target_file).read()
 hits = anchor.findall(src)
-assert len(hits) == 1, ("expected exactly one FO %s gbase_c = %s assignment, found %d"
-                        % (STATE, FO_BASELINE, len(hits)))
+assert len(hits) == 1, ("axis %s: expected exactly one assignment of baseline %s, found %d"
+                        % (AXIS, base, len(hits)))
 old_val = hits[0][1]
-src = anchor.sub(lambda m: m.group(1) + repr(GBASE_FO), src, count=1)
-open("TCcell.hoc", "w").write(src)
+src = anchor.sub(lambda m: m.group(1) + repr(VALUE), src, count=1)
+open(target_file, "w").write(src)
 
 init = open("init.hoc").read()
 init = init.replace('state = "awake_long"', 'state = "%s"' % STATE, 1)
@@ -100,8 +120,8 @@ os.makedirs("../out", exist_ok=True)
 np.savez_compressed("../out/sweep_point.npz",
                     eeg_lp=eeg_lp, spike_times_ms=np.array(spikes, dtype=object),
                     pop=np.array(pops), dt_ms=DT_MS, tstop_s=TSTOP_MS/1000.0,
-                    state=STATE, gbase_fo=GBASE_FO, allow_pickle=True)
-json.dump({"gbase_fo": GBASE_FO, "gbase_fo_replaced": old_val, "state": STATE,
+                    state=STATE, axis=AXIS, value=VALUE, allow_pickle=True)
+json.dump({"axis": AXIS, "value": VALUE, "baseline_replaced": old_val, "state": STATE,
            "tstop_ms": TSTOP_MS, "wall_s": round(wall, 1),
            "core_s_per_model_s": round(wall/(TSTOP_MS/1000.0), 1),
            "peak_rss_mb": round(peak_mb, 1), "total_spikes": int(sum(len(s) for s in spikes)),
