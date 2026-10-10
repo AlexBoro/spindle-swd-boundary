@@ -153,33 +153,50 @@ A sweep budget must include the discarded warm-up cycle in the per-point cost. A
 ~28 s of warm-up plus a usable window, no point costs less than about 1.4
 core-hours even before the analysis window is chosen.
 
-## Run length is memory-bounded, not just CPU-bounded
+## Memory: the number, and what it cost to learn
 
-NEURON pre-allocates its recording vectors at run start from `tstop/dt`, so a
-run's entire memory cost is committed in the first seconds and does not grow
-afterwards. Measured with the 150 s and 300 s runs in flight together on the
-16 GB machine: available memory sat flat at 0.40 GB for the whole run, with two
-cores busy.
+NEURON sizes its recording Vectors from `tstop/dt` at run start. Measured
+directly with `getrusage(RUSAGE_CHILDREN)` around the NEURON child, 20 s of
+model time at `saveData = 20` peaks at **1910 MB** — **~95 MB per model-second**,
+linear in `tstop`:
 
-The scale is roughly `n_cells x (tstop/dt) x 8 bytes x (rows recorded + time)`.
-At 900 cells, `dt = 0.25` ms and `saveData = 20` that is about 4.3 GB for 150 s
-and 8.6 GB for 300 s of model time — before counting the time vector, which
-appears to be recorded per cell as well.
+| model time | peak RSS | fits in 15.3 GB free? |
+|---|---|---|
+| 20 s | 1.9 GB | yes |
+| 60 s | 5.6 GB | yes — this is why the 60 s run succeeded |
+| 150 s | 14.0 GB | marginal |
+| 300 s | 28.0 GB | no |
 
-Two consequences for the sweep, both of which bite before CPU does:
+Two runs were lost before this was measured. A 150 s and a 300 s run were
+launched concurrently on the 16 GB machine, together demanding ~42 GB; the 150 s
+was OOM-killed at 92% of its length (exit 137, `Killed`, no output, 3.3 hours
+spent). NEURON writes its `.dat` files only at the end, so a killed run yields
+nothing at all — not a partial trace.
 
-- **Concurrency is limited by RAM, not cores.** Six cores cannot run six long
-  simulations on this machine. Two runs of 150–300 s already commit essentially
-  all of 16 GB. A sweep point of useful length may occupy a whole machine.
-- **There is a maximum feasible run length per machine.** Much beyond 300 s at
-  these settings will not allocate at all locally. If the infra-slow cycle
-  requires many periods to characterise, that forces either a coarser `dt`, a
-  reduced recording set, or remote hosts with more memory — and that decision
-  should be made before committing to a sweep design.
+Worse, the failure was misdiagnosed at the time. Watching `available_gb` sit
+flat at 0.40 GB for two minutes was read as "allocation already succeeded, no
+growth to run out on". The flatness was the symptom, not the reassurance: the
+system was pinned at its floor. **Monitoring free memory tells you nothing
+useful once it is already near zero** — the figure that was needed is peak RSS
+of a completed run, and that takes one short run to obtain.
 
-This was found by watching memory during the stationarity runs rather than by
-planning, and it is the kind of constraint that would otherwise surface as an
-unexplained failed run partway through a sweep.
+**Rule.** Before choosing a run length, multiply model-seconds by 95 MB and
+compare against worker memory, with headroom. Never infer capacity from free
+memory during a run.
+
+## Remote compute is faster and removes the ceiling
+
+The same 20 s run on Modal (`cpu=2`, image `im-MjGYjvPyiWkNx8nW9DPCBa`,
+Python 3.8 + NEURON 7.8.2) takes **45.3 core-seconds per model-second** against
+**87.1** locally — about 1.9x faster per core — and memory is a `provider_params`
+field rather than a wall. Local cost estimates are therefore pessimistic for
+this provider, and the practical limit on run length is a number you request,
+not a property of the machine.
+
+Jobs must reduce in-container. Raw output is ~32 MB per model-second across 900
+files (9.6 GB for 300 s), far past what the harvest can carry; `sim/job_run.py`
+extracts spike times and coarse per-cell Vm and returns a ~1 MB `.npz`. This is
+the in-worker reduction the sweep design always required, now implemented.
 
 ## Open question: do the gaps fill in?
 
