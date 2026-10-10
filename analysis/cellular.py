@@ -14,8 +14,21 @@ sweeps/gkl_tcfo (which contains known SWDs) and the two spindle-baseline sweeps:
   TC_FO burst fraction       SWD 0.0% | wake, no SWD 0.0%
                              | spindle epoch 0.0-21.3%
 
-So they separate **wake-like from sleep-like**, cleanly and with a wide margin,
-and they do **not** separate SWD from wake. Do not use them as an SWD detector.
+Read those two rows differently.
+
+The **cortical excitatory rate** separates wake-like from sleep-like completely:
+every one of the 20 spindle-baseline points lies at 2.6-5.9 Hz and every one of
+the 17 wake-baseline windows at 28.3-31.7 Hz, a gap of a factor of five with no
+overlap. This is the load-bearing measure.
+
+The **TC_FO burst fraction is one-sided and must not be read as a separation.**
+Nonzero bursting implies sleep-like, but zero bursting does not imply wake-like:
+3 of the 20 spindle-baseline points sit at exactly 0.0%, the same value as every
+SWD and wake window. (All three are on the TC_FO leak axis; those three still
+have cortical rates of 2.6-3.9 Hz, so the rate criterion still places them
+correctly.) Quote the range as 0.0-21.3%, never as "18-21%".
+
+Neither measure separates SWD from wake. Do not use them as an SWD detector.
 Their use is the converse: to show that a perturbation did or did not move the
 network into the regime in which SWDs are possible at all. The TC_FO burst
 fraction reproduces a published signature -- Dervinis & Crunelli's Tables S1/S2
