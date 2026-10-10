@@ -27,17 +27,19 @@ os.chdir(MODEL)
 
 # --- patch the swept conductance -------------------------------------------
 src = open("TCcell.hoc").read()
-# The FO baseline value is what disambiguates: both the FO and HO branches have
-# a wake_long arm, and matching on wake_long alone hits two lines (FO 0.001325,
-# HO 0.0045). Requiring the FO value makes the match unique AND makes the patch
-# fail loudly if upstream ever changes that baseline.
-FO_WAKE_BASELINE = "0.001325"
+# The FO baseline value is what disambiguates: every state has both an FO and an
+# HO arm, so matching on the state name alone hits two lines (for wake_long,
+# FO 0.001325 and HO 0.0045). Requiring the FO value makes the match unique AND
+# makes the patch fail loudly if upstream ever changes that baseline.
+FO_BASELINE = {"wake_long": "0.001325", "spindles_long": "0.0008",
+               "slow_long": "0.0015", "delta_long": "0.0019",
+               "SWDs_long": "0.001395"}[STATE]
 anchor = re.compile(
-    r'(strcmp\(state,"wake_long"\)\)\s*\{\s*\n\s*GLUfullsyn\.gbase_c\s*=\s*)('
-    + re.escape(FO_WAKE_BASELINE) + r')')
+    r'(strcmp\(state,"' + re.escape(STATE) + r'"\)\)\s*\{\s*\n\s*GLUfullsyn\.gbase_c\s*=\s*)('
+    + re.escape(FO_BASELINE) + r')')
 hits = anchor.findall(src)
-assert len(hits) == 1, ("expected exactly one FO wake_long gbase_c = %s assignment, found %d"
-                        % (FO_WAKE_BASELINE, len(hits)))
+assert len(hits) == 1, ("expected exactly one FO %s gbase_c = %s assignment, found %d"
+                        % (STATE, FO_BASELINE, len(hits)))
 old_val = hits[0][1]
 src = anchor.sub(lambda m: m.group(1) + repr(GBASE_FO), src, count=1)
 open("TCcell.hoc", "w").write(src)

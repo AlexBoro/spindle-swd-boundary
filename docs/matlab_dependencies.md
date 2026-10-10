@@ -1,5 +1,38 @@
 # MATLAB dependencies of the SWD detector
 
+## `filter.mat` — resolved, and it is a dt trap
+
+`detectEEGspikesSWDs.m:76-86` designs the 8 Hz pre-filter **only if `filter.mat`
+is absent**; the deposit ships it, so the shipped path always loads cached
+coefficients. Read (MATLAB v7.3 / HDF5, written 2020-11-22), it contains:
+
+- top-level `b`, `a` — seven taps each, i.e. the **order-6 lowpass**. They match
+  a fresh `buttord(8/Nyq, 12/Nyq, 0.5, 10)` + `butter(n, Wn, 'low')` design at
+  **dt = 0.25 ms** to 4.6e-09 in the denominator. So at the deposit's default dt
+  the cached and computed paths are the same filter, and the port's computed
+  `prefilter()` reproduces the shipped behaviour exactly.
+- top-level `d` — a `designfilt` bandpass object. **The detector never
+  references `d`**; `load` simply dumps it into the function workspace. Its spec
+  is worth recording anyway because it is the *paper's* filter and not the
+  code's: `fspecs.bpmin`, Fs 4000, passband 2.7512–6.7512 Hz, stopband
+  0.7512–8.7512 Hz, Apass 0.5, Astop 65 dB, 17 second-order Butterworth
+  sections — ±2 Hz passband and ±4 Hz stopband about a centre of 4.7512 Hz,
+  exactly the paper's description. The running code instead designs its bandpass
+  fresh every call from `bandWidth = maxPowerFrequency + [-0.75 -0.5 0 0.5 0.75]`
+  with `stopbandAttenuation = 16`. **The paper-vs-code filter discrepancy is
+  therefore real and `filter.mat` does not resolve it** — the file preserves the
+  paper's filter as a variable nothing reads.
+
+**The trap.** `Wn` is normalised, so the cached lowpass is pinned to Fs = 4000 Hz
+with nothing in the file or at the call site recording that. At dt = 0.1 ms —
+which the run protocol contemplates for figure-quality runs — the same
+coefficients give a cutoff of **25 Hz instead of 8 Hz**. That is not a rounding
+difference: the 8 Hz pre-filter is what removes the ~9 Hz spindle/wake rhythm
+before the oscillation-frequency estimate, and the wake-vs-SWD discrimination in
+`sweeps/gkl_tcfo/` rests on it. Any run at a dt other than 0.25 ms must delete or
+bypass `filter.mat`. The port computes the design from `dt` on every call and so
+does not inherit this.
+
 **Correction (supersedes this file's original claim).** This document previously
 stated that `detectEEGspikesSWDs.m` depends on three helper functions "absent
 from both Zenodo deposits", and the project fetched them from
