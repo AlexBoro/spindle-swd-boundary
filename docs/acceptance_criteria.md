@@ -47,8 +47,8 @@ population fires first.
 
 | ID | Criterion | Source | Status |
 |---|---|---|---|
-| C4.1 | **+5% `g_KL` in TC_FO** produces spontaneous SWDs at **~4 Hz** | [B] | TODO |
-| C4.2 | Further `g_KL` increase leaves SWD frequency and duration unchanged, but decreases then prolongs the **interictal period** | [B] | TODO |
+| C4.1 | **+5% `g_KL` in TC_FO** produces spontaneous SWDs at **~4 Hz** | [B] | **PASS** — the shipped SWD value 0.001395 is +5.28 % of the `wake_long` baseline and yields SWDs at 4.75 Hz (`sweeps/gkl_tcfo/`). Onset is at **+2.64 %** (0.001360), 1.4 % below the authors' own `> 0.0013792` comment. The text's "~4 Hz" is looser than their own Table S1/S2 range of 4.60–5.45 Hz; we match the table |
+| C4.2 | Further `g_KL` increase leaves SWD frequency and duration unchanged, but decreases then prolongs the **interictal period** | [B] | **PARTIAL** — frequency is near-flat over 0.001360→0.001440 (5.00→4.67 Hz, a 6.6 % monotone decline, not "unchanged" but close); duration is non-monotone (8.25→14.92→11.63→13.82 s) with no trend. The **interictal limb is untestable at 60 s**: only 2 of 7 supra-threshold points contain a complete interictal period. Needs ≥5 min records |
 | C4.3 | Increasing **`g_eGABAa`** (extrasynaptic GABA-A) of TC_FO directly also produces SWDs | [B] | TODO |
 | C4.4 | Decreasing cortical **`g_GABAa` by 10% and 25%** produces SWDs of progressively larger amplitude and longer interictal periods | [B] | TODO |
 | C4.5 | Increasing **cortical AMPA** function produces ~4 Hz SWDs | [B] | TODO |
@@ -68,11 +68,11 @@ columns: 6 in Table S1 (tonic inhibition of TC_FO, two routes × three levels) a
 
 | ID | Criterion | Status |
 |---|---|---|
-| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all 15 pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | **PROVISIONAL PASS** — 4.76 Hz on the deposit's own `SWDs_long` state (60 s, Modal). Within-event measure, meaningful at n=1 |
-| C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | **PROVISIONAL, n=1** — 11.63 s, in range. A single discharge is not a mean |
-| C4.13 | Mean interictal period **19.81–48.39 s** | TODO |
-| C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | **WEAK, n=1** — 36.34 % over 32 s of usable record. Rests on one event; not a usable estimate |
-| C4.15 | SWD incidence **1.01–1.85 min⁻¹** | **FAIL (weak), n=1** — 1.88 min⁻¹, just above range. One event in 32 s cannot estimate a rate; re-measure on a long run |
+| C4.11 | Intra-SWD frequency falls in **4.60–5.45 Hz** across all 15 pathology columns. The four routes the text calls "~4 Hz" measure **4.60–5.09 Hz**; increased I_T in NRT is the fastest at **5.45 Hz** | **PASS, n=7** — 4.67–5.00 Hz across seven supra-threshold points of the TC_FO leak sweep, inside 4.60–5.45. C4.11 is a claim about spread across routes, so across-parameter sampling is the right comparison |
+| C4.12 | Mean SWD duration **8.76–21.96 s**; longest is increased I_T in TC_HO level 2 (21.96 ± 0.77 s) | **PASS, n=9 events** — mean 11.75 s (range 7.07–18.11), inside the published 8.76–21.96 range of means. No event touches a window edge, so nothing is censored |
+| C4.13 | Mean interictal period **19.81–48.39 s** | **PROVISIONAL, n=2** — 33.57 s (0.001410) and 27.12 s (0.001440), both in range. Only two complete interictal periods exist in the whole sweep |
+| C4.14 | Time spent in SWDs **16.34–47.15 %**; highest is increased I_T in TC_HO level 2 (47.15 %) | **PASS on 6 of 7** — 19.4–46.1 % at the six points above 0.001360, inside 16.34–47.15. The seventh (0.001360, 13.7 %) is the just-above-onset point, which has no counterpart in the authors' table |
+| C4.15 | SWD incidence **1.01–1.85 min⁻¹** | **BLOCKED ON RECORD LENGTH** — retracts the earlier FAIL. In a 60 s window incidence is quantised to integer multiples of 1 min⁻¹ (measured: 1 or 2), so the published 1.01–1.85 range cannot be resolved in principle. Needs ≥5 min records |
 | C4.16 | **Leading structure is L4 in all 15 pathology columns**, without exception | TODO |
 | C4.17 | Poly-spikes present in all 15 pathology columns | TODO |
 | C4.18 | Mean spike-to-wave amplitude **3.02–8.45 µV**; mean PSI **0.52–0.82** | TODO |

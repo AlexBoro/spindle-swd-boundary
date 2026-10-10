@@ -1,3 +1,22 @@
+> **Status note — added after the draft was sent.** The TC_FO leak sweep in
+> `sweeps/gkl_tcfo/` has since answered items 1 and 3 from our own side.
+>
+> **Item 1 is settled: `awake_long` is a typo for `wake_long`.** Sweeping the
+> TC_FO `gbase_c` from the `wake_long` baseline puts the SWD onset at 0.001360,
+> within 1.4 % of the authors' own `> 0.0013792` comment; from the `awake_long`
+> fall-through default of 0.001 it would need a 36 % rise. A confirmation is
+> still welcome but nothing now waits on it.
+>
+> **Item 3 is answered against the premise of the question.** The hardcoded
+> `sdEEGfilt` is load-bearing: restoring `std(EEGfiltBP)` makes the detector
+> scale-invariant, and it then reports SWDs at every point of the sweep
+> including the wake baseline, because amplitude is the only thing separating
+> the two states in the band-passed signal. The constant should stay.
+>
+> Items 2 (pathology-level conductance multipliers) and 4 (the `pksLocsLarge`
+> omission and the `hilbertTransform` conjugate transpose) are unaffected, and
+> item 2 is now the only one blocking work.
+
 **To:** Martynas Dervinis; Vincenzo Crunelli
 **Subject:** Three questions about the thalamocortical2 code (Zenodo 7724443)
 

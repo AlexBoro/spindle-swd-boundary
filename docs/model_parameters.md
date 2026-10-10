@@ -62,9 +62,15 @@ sets out to measure independently.
 - **TC_FO leak route.** `TCcell.hoc` marks the SWD setting `0.001395` with the
   comment `> 0.0013792`. Against the wake baseline of 0.001325 that places the SWD
   **onset threshold at +4.09 %** and the shipped SWD value at **+5.28 %** — which
-  is the paper's "increasing (by 5 %) the leak conductance". *Phase 3 should
-  recover p\* ≈ 0.0013792 for this axis; a large disagreement means the
-  susceptibility protocol is mis-specified.*
+  is the paper's "increasing (by 5 %) the leak conductance". **Measured** (see
+  `sweeps/gkl_tcfo/`): SWDs first appear at **0.001360**, +2.64 % of baseline and
+  1.4 % below the authors' stated threshold. Independently, the EEG's dominant
+  rhythm steps from 8.06 Hz to 4.88 Hz between 0.001345 and 0.001360. The
+  comment is confirmed to ~1 %.
+- **The swept parameter moves alone only above 0.0012.** `TCcell.hoc:558` sets
+  `gbar_c = min(0.0017, (gbase_c/0.0012)*0.0017)`, which saturates for
+  `gbase_c` ≥ 0.0012. Within the SWD route `gbar_c` is pinned at 0.0017 and does
+  not co-vary; a sweep extended below 0.0012 silently becomes two-parameter.
 - **TC_HO leak route.** The comment `//4Hz: 0.0046; 7Hz: 0.0028` gives both SWD
   frequency regimes directly. Criterion C4.7 (decreased TC_HO leak → ~7 Hz) is
   therefore 0.0045 → **0.0028**, a −38 % change.
@@ -76,9 +82,14 @@ sets out to measure independently.
 1. **TC_HO "Depolarised" leak disagrees by 2.2 %** — Table S9 gives 0.0044, the
    code gives 0.0045. Small, but it is the baseline for one of the axes, so the
    sweep should be anchored on the **code** value and the discrepancy noted.
-2. **The shipped code sets TC_HO leak identically (0.0045) for `wake_*` and
-   `SWDs_*`.** Consistent with the SWD protocol starting from `awake_long` and
-   perturbing a different conductance, but worth confirming against the authors.
+2. ~~**The shipped code sets TC_HO leak identically (0.0045) for `wake_*` and
+   `SWDs_*`.**~~ **Closed.** Not just TC_HO leak — *every* `wake_long` /
+   `SWDs_long` branch pair in `TCcell.hoc`, `NRTcell.hoc` and `Cx3cell.hoc` is
+   identical (`g_naleak`, `shift_iarg`, `cac_iarg`, NRT `gkbar1/2_iahp`, NRT and
+   TC_HO `gbase_c`, cortical `g_pas` and `reduce`). The sole difference in the
+   model is TC_FO `gbase_c`, 0.001325 → 0.001395. The authors' SWD state is a
+   one-parameter continuation from wake, which is why sweeping that parameter
+   recovers their threshold.
 3. **Pathology levels 1/2/3 remain undefined for four axes** — extrasynaptic
    `g_eGABAa`, cortical AMPA, NRT I_T, and TC_HO I_T. Only the cortical GABA-A
    levels are fully pinned. The TC_HO I_T axis is this project's nominated primary
