@@ -53,6 +53,30 @@ elif AXIS in ("cx_gabaa", "cx_ampa"):
     var, base = (("GABAsyn.gbar_a", "0.068") if AXIS == "cx_gabaa"
                  else ("GLUsyn.gbar_a", "0.001945"))
     anchor = re.compile(r'(' + re.escape(var) + r'\s*=\s*)(' + re.escape(base) + r')')
+elif AXIS == "tc_naleak":
+    # Sweep the thalamic Na leak itself, 0 (every sleep state) to 0.000052 (wake
+    # FO). The deposit implements vigilance states as five hand-tuned parameter
+    # sets, so g_naleak steps 0 -> 0.000052 with nothing between; this axis
+    # supplies the intermediate values the model does not define. HO is scaled
+    # by the wake FO:HO ratio so the two orders keep their published relation.
+    target_file = "TCcell.hoc"
+    HO_RATIO = 0.00003 / 0.000052
+    else_block = ('            } else {\n'
+                  '                g_naleak = 0\n'
+                  '            }')
+    src0 = open(target_file).read()
+    assert src0.count(else_block) == 1, ("naleak else-block matched %d times"
+                                         % src0.count(else_block))
+    repl = ('            } else {\n'
+            '                if (!strcmp(section, "FO")) {\n'
+            '                    g_naleak = %r\n'
+            '                } else {\n'
+            '                    g_naleak = %r\n'
+            '                }\n'
+            '            }' % (VALUE, VALUE * HO_RATIO))
+    open(target_file, "w").write(src0.replace(else_block, repl, 1))
+    anchor = None
+    base = "0"
 else:
     raise SystemExit("unknown axis %r" % AXIS)
 
@@ -82,13 +106,16 @@ def apply_mod(name):
 
 mod_log = [apply_mod(m) for m in MODS]
 
-src = open(target_file).read()
-hits = anchor.findall(src)
-assert len(hits) == 1, ("axis %s: expected exactly one assignment of baseline %s, found %d"
-                        % (AXIS, base, len(hits)))
-old_val = hits[0][1]
-src = anchor.sub(lambda m: m.group(1) + repr(VALUE), src, count=1)
-open(target_file, "w").write(src)
+if anchor is None:
+    old_val = base
+else:
+    src = open(target_file).read()
+    hits = anchor.findall(src)
+    assert len(hits) == 1, ("axis %s: expected exactly one assignment of baseline %s, found %d"
+                            % (AXIS, base, len(hits)))
+    old_val = hits[0][1]
+    src = anchor.sub(lambda m: m.group(1) + repr(VALUE), src, count=1)
+    open(target_file, "w").write(src)
 
 init = open("init.hoc").read()
 init = init.replace('state = "awake_long"', 'state = "%s"' % STATE, 1)
