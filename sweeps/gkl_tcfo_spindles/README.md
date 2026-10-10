@@ -107,7 +107,16 @@ cannot assume otherwise.
 ```
 python sim/job_sweep.py 90000 spindles_long tc_fo_gkl 0.0014
 ```
-`summary.csv` carries the Modal job id for every point. Note that for
-`gbase_c` < 0.0012 the derived tonic conductance `gbar_c = min(0.0017,
-(gbase_c/0.0012)*0.0017)` has not yet saturated, so the two lowest points move
-two conductances rather than one; above 0.0012 the sweep is single-parameter.
+`summary.csv` carries the Modal job id for every point.
+
+One caveat on the low end of the range. The derived tonic conductance is set
+twice in `TCcell.hoc`, with **different denominators per thalamic order**:
+`gbar_c = min(0.0017, (gbase_c/0.0012)*0.0017)` for FO at line 554, and
+`/0.000775` for HO at line 581. Both sit *outside* the `strcmp(state)` arms —
+after the chain, applied to whatever the chain left in `gbase_c` — so a diff
+that only reads branch bodies sees the HO form and misses the FO one. This
+sweep moves the **FO** parameter, so `/0.0012` is the relevant formula: it
+saturates at `gbase_c` ≥ 0.0012, meaning the two lowest points (0.0008 and
+0.0010) move the tonic conductance as well as the leak, while the eight points
+from 0.0012 up are single-parameter. The wake sweep in `sweeps/gkl_tcfo/` lies
+entirely above 0.0012 and is single-parameter throughout.

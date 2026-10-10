@@ -67,10 +67,16 @@ sets out to measure independently.
   1.4 % below the authors' stated threshold. Independently, the EEG's dominant
   rhythm steps from 8.06 Hz to 4.88 Hz between 0.001345 and 0.001360. The
   comment is confirmed to ~1 %.
-- **The swept parameter moves alone only above 0.0012.** `TCcell.hoc:558` sets
-  `gbar_c = min(0.0017, (gbase_c/0.0012)*0.0017)`, which saturates for
-  `gbase_c` ≥ 0.0012. Within the SWD route `gbar_c` is pinned at 0.0017 and does
-  not co-vary; a sweep extended below 0.0012 silently becomes two-parameter.
+- **The swept parameter moves alone only above 0.0012.** The derived tonic
+  conductance is set twice, with **different denominators per thalamic order**
+  and *outside* the `strcmp(state)` arms — after the chain, applied to whatever
+  it left in `gbase_c`. FO: `gbar_c = min(0.0017, (gbase_c/0.0012)*0.0017)`.
+  HO: the same with `/0.000775` (under the `_long` group) or `/0.0012`
+  otherwise. For the FO route the formula saturates at `gbase_c` ≥ 0.0012, so
+  within the SWD route `gbar_c` is pinned at 0.0017 and does not co-vary; a
+  sweep extended below 0.0012 silently becomes two-parameter. **A diff that
+  reads only `strcmp` branch bodies will see the HO form and miss the FO one**
+  — the two were conflated once already.
 - **TC_HO leak route.** The comment `//4Hz: 0.0046; 7Hz: 0.0028` gives both SWD
   frequency regimes directly. Criterion C4.7 (decreased TC_HO leak → ~7 Hz) is
   therefore 0.0045 → **0.0028**, a −38 % change.
