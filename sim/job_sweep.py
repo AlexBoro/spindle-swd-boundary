@@ -56,6 +56,32 @@ elif AXIS in ("cx_gabaa", "cx_ampa"):
 else:
     raise SystemExit("unknown axis %r" % AXIS)
 
+# Optional modifiers, comma-separated in argv[5]. These are not swept; they
+# restore a single wake/SWD-only setting onto a sleep baseline, to test which of
+# the seven state differences gates spike-wave (see sweeps/gkl_tcfo_spindles/).
+MODS = [m for m in (sys.argv[5].split(",") if len(sys.argv) > 5 else []) if m]
+
+
+def apply_mod(name):
+    """Patch one state-chain condition so a sleep state takes the wake branch."""
+    if name == "tc_naleak_wake":
+        # TCcell.hoc:169 gives the thalamic Na leak a nonzero value only for
+        # wake_*/SWDs_*; every sleep state falls to the else at 0. Add the
+        # swept state to that condition so relay cells get the wake leak.
+        fn = "TCcell.hoc"
+        cond = ('if (!strcmp(state,"SWDs_short") || !strcmp(state,"SWDs_long") '
+                '|| !strcmp(state,"wake_short") || !strcmp(state,"wake_long")) {')
+        s = open(fn).read()
+        assert s.count(cond) == 1, "naleak condition matched %d times" % s.count(cond)
+        assert cond.endswith(') {')
+        s = s.replace(cond, cond[:-3] + ' || !strcmp(state,"%s")) {' % STATE, 1)
+        open(fn, "w").write(s)
+        return "TCcell.hoc naleak condition += %s" % STATE
+    raise SystemExit("unknown modifier %r" % name)
+
+
+mod_log = [apply_mod(m) for m in MODS]
+
 src = open(target_file).read()
 hits = anchor.findall(src)
 assert len(hits) == 1, ("axis %s: expected exactly one assignment of baseline %s, found %d"
@@ -121,7 +147,7 @@ np.savez_compressed("../out/sweep_point.npz",
                     eeg_lp=eeg_lp, spike_times_ms=np.array(spikes, dtype=object),
                     pop=np.array(pops), dt_ms=DT_MS, tstop_s=TSTOP_MS/1000.0,
                     state=STATE, axis=AXIS, value=VALUE, allow_pickle=True)
-json.dump({"axis": AXIS, "value": VALUE, "baseline_replaced": old_val, "state": STATE,
+json.dump({"axis": AXIS, "value": VALUE, "mods": MODS, "mod_log": mod_log, "baseline_replaced": old_val, "state": STATE,
            "tstop_ms": TSTOP_MS, "wall_s": round(wall, 1),
            "core_s_per_model_s": round(wall/(TSTOP_MS/1000.0), 1),
            "peak_rss_mb": round(peak_mb, 1), "total_spikes": int(sum(len(s) for s in spikes)),
