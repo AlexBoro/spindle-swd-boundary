@@ -30,10 +30,10 @@ population fires first.
 
 | ID | Criterion | Source | Status |
 |---|---|---|---|
-| C2.1 | Spindles occur in the **7–14 Hz** band | [B] | **PROVISIONAL PASS** — 8.91 Hz (EEG, `oscFreq` spindles band) in both post-warm-up epochs of the 60 s run; 8.79 Hz from population rate. n=2 epochs |
-| C2.2 | Spindle waves appear **regularly** in the EEG with the classical waxing–waning waveform | [A] | **PARTIAL** — waxing–waning envelope present (peak 9.23 µV); but epochs are separated by ~21 s of *flat-zero* EEG, not low-amplitude background. "Regularly" holds on the ~28 s infra-slow cycle, not as continuous NREM |
-| C2.3 | **Onset sequence: NRT_FO first**, followed within a few ms by TC_HO and NRT_HO, then TC_FO and cortical neurons | [A] | **PROVISIONAL PASS, n=2** — observed NRT_FO → NRT_HO → TC_HO → TC_FO, matching the prediction. Per-epoch spread (TC_HO ±100 ms) is as large as the gaps being ranked, so this is not yet evidence |
-| C2.4 | The spindle **builds in thalamus before** being reflected into cortex | [A] | **PARTIAL, n=2** — NRT (35–41 ms) and TC_HO (88 ms) precede most cortex, but L5_E (110 ms) precedes TC_FO (172 ms), so the separation is not clean |
+| C2.1 | Spindles occur in the **7–14 Hz** band | [B] | **PASS** — 9.06 ± 0.26 Hz across **11 post-warm-up cycles** of the 300 s run (range 8.79–9.28); EEG gives 8.91 Hz on the 60 s run. Comfortably inside 7–14 Hz |
+| C2.2 | Spindle waves appear **regularly** in the EEG with the classical waxing–waning waveform | [A] | **PARTIAL, n=11** — waxing–waning envelope present (peak 9.23 µV) and epochs recur regularly (gap 16.7 ± 1.7 s). But the gaps are *flat-zero* EEG, not low-amplitude background, and **they do not fill in over 300 s** — so this is an all-or-none alternation, not NREM-like continuous activity |
+| C2.3 | **Onset sequence: NRT_FO first**, followed within a few ms by TC_HO and NRT_HO, then TC_FO and cortical neurons | [A] | **FAIL as a strict order; PASS in weakened form** — over 11 cycles the exact predicted order occurs in **1 of 11**. First to fire: NRT_FO 5, NRT_HO 4, TC_HO 2, TC_FO 0. What *does* hold: an **NRT population leads in 9 of 11** and **TC_FO never leads**. The n=2 result that matched the prediction exactly was chance |
+| C2.4 | The spindle **builds in thalamus before** being reflected into cortex | [A] | **PARTIAL, n=11** — NRT consistently leads, and TC_FO is never first, so thalamus does initiate. But the four thalamic populations' onsets span a median of 156 ms against a 110 ms spindle cycle, so "within a few ms" does not hold |
 | C2.5 | First firing of a spindle cycle may alternatively originate in **TC_HO** | [A] | TODO |
 | C2.6 | Spindle sequences are **grouped by slow-oscillation up-states** | [A] | TODO |
 
