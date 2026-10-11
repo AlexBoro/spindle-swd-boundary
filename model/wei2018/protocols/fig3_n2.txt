@@ -1,0 +1,11 @@
+# Wei 2018 Fig 2/3, single sequence, sleep = n2
+# tmax = 562000 ms (paper t = 550 s + 12 s warm-up)
+state 0 12000 awake
+state 12000 212000 awake
+state 212000 512000 n2
+state 512000 562000 awake
+seq 1 5 200 205 210 215 220
+test 1 12000 62000 0
+train 1 62000 162000 0
+test 1 162000 212000 0
+test 1 512000 562000 0

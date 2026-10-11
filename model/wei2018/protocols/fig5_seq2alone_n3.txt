@@ -1,0 +1,11 @@
+# Wei 2018 Fig 5i black line: Seq2 alone 40 s, N3 300 s
+# tmax = 562000 ms (paper t = 550 s + 12 s warm-up)
+state 0 12000 awake
+state 12000 212000 awake
+state 212000 512000 n3
+state 512000 562000 awake
+seq 2 5 296 291 286 281 276
+test 2 12000 62000 500
+train 2 62000 102000 500
+test 2 162000 212000 500
+test 2 512000 562000 500

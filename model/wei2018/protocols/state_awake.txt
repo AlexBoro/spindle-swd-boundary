@@ -1,0 +1,3 @@
+# physiology gate: awake only, no stimulus (run with -plasticity_start 1e12)
+state 0 1000000000 awake
+seq 1 5 200 205 210 215 220
