@@ -1,0 +1,44 @@
+na,kl,alive,n_swds,band_power,src,cls
+0.0,0.0008,True,0,3.337857133833776,sweep2,spindling
+0.0,0.001,True,0,3.628741096238153,sweep2,spindling
+0.0,0.0012,True,0,1.4280828019308367,sweep2,spindling
+0.0,0.0013,True,0,1.8882563323204706,sweep2,spindling
+0.0,0.0014,True,0,2.3580036281644663,sweep2,spindling
+0.0,0.0015,True,0,2.865422052242934,sweep2,spindling
+0.0,0.0016,True,0,2.5738374092268543,sweep2,spindling
+0.0,0.0018,True,0,2.5427617566092975,sweep2,spindling
+0.0,0.0021,True,0,2.0279455743124637,sweep2,spindling
+0.0,0.0025,True,0,1.3360600463441807,sweep2,spindling
+5e-06,0.0008,True,0,3.7903550386725176,sweep6,spindling
+1e-05,0.0008,False,0,,sweep6,dead
+1.5e-05,0.0008,False,0,,sweep6,dead
+2e-05,0.0008,True,0,1.8449417899820788,sweep6,spindling
+2.6e-05,0.0008,True,0,1.5743025294990436,sweep6,spindling
+3.2e-05,0.0008,True,0,2.1695808612236824,sweep6,spindling
+4e-05,0.0008,True,0,0.1850875958867811,sweep6,"awake-like, no spindles"
+4.6e-05,0.0008,True,0,0.14471849560326994,sweep6,"awake-like, no spindles"
+5.2e-05,0.0008,True,0,0.15727361999007353,sweep6,"awake-like, no spindles"
+5.2e-05,0.001,True,0,0.1418531885246485,sweep5,"awake-like, no spindles"
+5.2e-05,0.0012,True,0,0.1652899993710789,sweep5,"awake-like, no spindles"
+5.2e-05,0.0013,False,0,,sweep5,dead
+5.2e-05,0.00136,False,0,,sweep5,dead
+5.2e-05,0.0014,False,0,,sweep5,dead
+5.2e-05,0.0015,False,0,,sweep5,dead
+5.2e-05,0.0016,False,0,,sweep5,dead
+5.2e-05,0.0018,False,0,,sweep5,dead
+5.2e-05,0.0021,False,0,,sweep5,dead
+2e-05,0.001,False,0,,slice,dead
+2e-05,0.0012,False,0,,slice,dead
+2e-05,0.0013,False,0,,slice,dead
+2e-05,0.00136,False,0,,slice,dead
+2e-05,0.0015,False,0,,slice,dead
+2.6e-05,0.001,False,0,,slice,dead
+2.6e-05,0.0012,False,0,,slice,dead
+2.6e-05,0.0013,False,0,,slice,dead
+2.6e-05,0.00136,False,0,,slice,dead
+2.6e-05,0.0015,False,0,,slice,dead
+3.2e-05,0.001,True,0,1.801380612162196,slice,spindling
+3.2e-05,0.0012,False,0,,slice,dead
+3.2e-05,0.0013,False,0,,slice,dead
+3.2e-05,0.00136,False,0,,slice,dead
+3.2e-05,0.0015,False,0,,slice,dead
