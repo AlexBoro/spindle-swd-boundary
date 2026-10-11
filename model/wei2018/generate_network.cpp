@@ -201,6 +201,7 @@ int parse_config(char const *file){
   }//connections
 
   fclose(f);
+  return 0;
 }
 
 //representing single synaptic connection when generating network
