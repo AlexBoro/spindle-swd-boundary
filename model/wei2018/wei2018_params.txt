@@ -113,3 +113,14 @@ gaba_cx_n3    0.44
 gaba_th_awake 0.6
 gaba_th_n2    0.72
 gaba_th_n3    1.2
+
+# ---------------- STDP: Wei 2018 Methods, 'Spike-timing dependent synaptic plasticity' ----------------
+# 'we set A+ = A- = 0.002, and tau+ = tau- = 20 ms' (tau = TauL = 20 in AMPA_D3, unchanged)
+stdp_cP       0.002
+stdp_cD       0.002
+# donor halved depression inside training windows (cD = 0.001); Wei 2018 states symmetric amplitudes
+stdp_cD_train 0.002
+# 'We reduced the STDP amplitude A+ and A- to 0.001 during slow-wave sleep' -> factor 0.5.
+# Applied in both N2 and N3 (interpretation I2); donor used 0.75 in its N3 block.
+stdp_factor_n2 0.5
+stdp_factor_n3 0.5
