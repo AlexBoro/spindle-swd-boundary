@@ -1,0 +1,10 @@
+variant,state,modal_job_id,run_id,git_sha,args,cfg_overrides,wall_s,threads,n_spikes
+v0,awake,32e704d8-fcb2-4ee3-addd-4e916261dcf9,state_awake_s0_b8996b,67960a4,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,,1646,16,70297
+v0,n2,5814d60d-fef7-4961-bb73-a220492c77c9,state_n2_s0_b8996b,67960a4,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,,1460,16,192321
+v0,n3,90b41b74-2470-4d33-82b0-c9da490f6ae3,state_n3_s0_b8996b,67960a4,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,,1267,16,453757
+v1_mini0.0002,awake,4fc9a714-63e2-4ede-8e87-15d94098a1ac,state_awake_s0_60c1b6,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,CX:CX:AMPA_D3:mini_s=0.0002,2129,16,36598
+v1_mini0.0002,n2,875d43e6-ada5-4165-987f-b7b09822a196,state_n2_s0_60c1b6,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,CX:CX:AMPA_D3:mini_s=0.0002,1277,16,105006
+v1_mini0.0002,n3,501d0869-41a9-48b5-bd4c-04ccbcf40c8c,state_n3_s0_60c1b6,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12,CX:CX:AMPA_D3:mini_s=0.0002,1513,16,385913
+v1_mini0.0002_ampaTC0.5,awake,168f1999-3b19-462f-8085-ef284a141b05,state_awake_s0_6e9dc8,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12 -ampa_th_awake 0.5,CX:CX:AMPA_D3:mini_s=0.0002,1250,16,36598
+v1_mini0.0002_ampaTC0.5,n2,9acd7c41-3bf5-480c-85d1-b92f680d1779,state_n2_s0_e03814,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12 -ampa_th_n2 0.5,CX:CX:AMPA_D3:mini_s=0.0002,1211,16,109980
+v1_mini0.0002_ampaTC0.5,n3,541e6ca8-50bd-48bf-a0dc-ad867bc93dd2,state_n3_s0_2138f6,f7a6d6a,-sim_seed 0 -num_mp_threads 16 -tmax 60000 -plasticity_start 1e12 -ampa_th_n3 0.5,CX:CX:AMPA_D3:mini_s=0.0002,1225,16,376413
