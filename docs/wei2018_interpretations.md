@@ -81,3 +81,35 @@ during tests, so that a test does not change what it measures.
 count (minor floating-point ordering). Runs record `num_mp_threads`, and runs with
 the same seed and thread count are bit-identical (checked: two 150 ms runs at 2
 threads gave identical spike and LFP files).
+
+## Analysis choices (analysis/wei2018.py)
+
+**A1. Recall smoothing kernel.** "a Gaussian kernel (50ms window size)" is read as
+MATLAB `gausswin(50)` (alpha 2.5, sigma about 9.8 ms), normalised to unit area, on
+1 ms bins. A group with no spike in the 350 ms window is absent from the recalled
+string, as the definition of S2 implies.
+
+**A2. Replay chaining.** Leading neuron = lowest index of the 25-cell area; the
+chain runs up the indices to the last cell of the area. Rejected neurons (no spike
+within 50 ms of the running reference) are excluded from their group's mean
+time; a group with no accepted neuron is absent. Strings are labelled in
+activation order, so 'ABCDE' is the correct replay for Seq2 as well. "Correct" =
+SM >= 0.8 (the recall threshold); SM = 1 counts are reported alongside.
+
+**A3. Synaptic box.** "Synaptic weights between neurons in direction of sequence
+activation" = PY-PY synapses with both cells in the 25-cell area and the
+presynaptic cell earlier in the trained order (110 synapses per sequence).
+Change is the mean of g(t)/g(0) - 1 over those synapses, per synapse relative to
+its own jittered initial value.
+
+**A4. LFP proxy.** Mean PY somatic voltage at 1 kHz (the donor's own `time_cx`
+mean column). The paper filters it 0.2-20 Hz for display only.
+
+**A5. Spindle detector.** 7-14 Hz Butterworth (order 4, zero phase), Hilbert
+envelope, peak > mean + 2 SD, bounded at mean + 1 SD, duration 0.5-3 s (the
+paper's own description of N2 spindles). The paper gives no detector; density
+is compared with its stated ~5/min (S5B Fig).
+
+**A6. Up states.** PY population rate in 10 ms bins, 50 ms boxcar, Up where
+> 20% of the window maximum and >= 50 ms long. SO frequency = Up states per
+second, compared with the paper's ~0.7 Hz (S6B Fig).
