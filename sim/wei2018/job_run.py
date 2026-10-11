@@ -17,7 +17,10 @@ import hashlib, json, os, re, subprocess, sys, tarfile, time
 import numpy as np
 
 src, proto, seed, threads = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-extra = sys.argv[5:]
+extra = [a for a in sys.argv[5:] if not a.startswith("@")]
+# '@FROM:TO:SYN:FIELD=VALUE' rewrites one field of a network.cfg connection row,
+# FIELD in {radius, prob, strength, mini_s, mini_f}; e.g. @CX:CX:AMPA_D3:mini_s=0.0002
+cfg_over = [a[1:] for a in sys.argv[5:] if a.startswith("@")]
 work = os.path.abspath("build"); os.makedirs(work, exist_ok=True)
 os.makedirs("out", exist_ok=True)
 with tarfile.open(src) as t:
@@ -29,6 +32,20 @@ if os.path.exists(os.path.join(work, "GIT_SHA")):
     meta["git_sha"] = open(os.path.join(work, "GIT_SHA")).read().strip()
 meta["gxx"] = subprocess.run(["g++", "--version"], capture_output=True, text=True).stdout.splitlines()[0]
 subprocess.run("make -s mindcurrent > build.log 2>&1 || (cat build.log; exit 1)", shell=True, cwd=M, check=True)
+FIELDS = {"radius": 3, "prob": 5, "strength": 8, "mini_s": 9, "mini_f": 10}
+if cfg_over:
+    cfg = open(os.path.join(M, "network.cfg")).read().splitlines()
+    for o in cfg_over:
+        key, val = o.split("=")
+        fr, to, syn, field = key.split(":")
+        hits = [i for i, l in enumerate(cfg) if l.split()[:3] == [fr, to, syn]]
+        assert len(hits) == 1, f"{key}: {len(hits)} matching rows"
+        f = cfg[hits[0]].split()
+        old_v = f[FIELDS[field]]; f[FIELDS[field]] = val
+        cfg[hits[0]] = "  " + "  ".join(f)
+        print("CFG", key, old_v, "->", val, flush=True)
+    open(os.path.join(M, "network.cfg"), "w").write("\n".join(cfg) + "\n")
+meta["cfg_overrides"] = cfg_over
 subprocess.run("g++ -O2 generate_network.cpp -o generate_network 2>/dev/null && "
                "./generate_network > connection_info2 2>gen.log", shell=True, cwd=M, check=True)
 meta["binary_sha256"] = hashlib.sha256(open(os.path.join(M, "mindcurrent"), "rb").read()).hexdigest()
@@ -40,7 +57,8 @@ if tmax is not None and "-tmax" not in extra:
     args += ["-tmax", str(tmax)]
 args += extra
 meta["args"] = args
-run_id = f"{proto}_s{seed}" + ("_" + hashlib.sha1(" ".join(extra).encode()).hexdigest()[:6] if extra else "")
+tag = " ".join(extra + cfg_over)
+run_id = f"{proto}_s{seed}" + ("_" + hashlib.sha1(tag.encode()).hexdigest()[:6] if tag else "")
 raw = os.path.abspath("raw"); os.makedirs(raw, exist_ok=True)
 t0 = time.time()
 with open("sim_stdout.log", "w") as so, open("sim_stderr.log", "w") as se:
