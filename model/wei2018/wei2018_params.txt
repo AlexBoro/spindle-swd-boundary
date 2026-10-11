@@ -74,3 +74,42 @@ plasticity_start 12000
 weight_dt 1000
 lfp_dt 1
 weight_jitter 1
+
+# ---------------- vigilance states: Wei 2018 Methods, 'Neuromodulators and sleep stages' ----------------
+# Literal per-state values from the paper (awake / N2 / N3). They do NOT follow one
+# common scale of the awake value; each is entered as published.
+# AChgkl, cortical PY and IN K-leak: 'AChgkl = 0.133, 0.228 and 0.38 for awake, N2 and N3'
+gkl_cx_awake 0.133
+gkl_cx_n2    0.228
+gkl_cx_n3    0.38
+# AChgkl, TC: '0.4, 0.96, and 1.6 for awake, N2 and N3'
+gkl_tc_awake 0.4
+gkl_tc_n2    0.96
+gkl_tc_n3    1.6
+# AChgkl, RE: '0.9, 0.81, and 0.45 for awake, N2 and N3'
+gkl_re_awake 0.9
+gkl_re_n2    0.81
+gkl_re_n3    0.45
+# HAgh, mV shift of TC Ih activation: '-24 mV, -2 mV, -1 mV for awake, N2 and N3'
+gh_tc_awake -24
+gh_tc_n2    -2
+gh_tc_n3    -1
+# AChAMPA 'from PY cells is 0.133, 0.1938, and 0.4332' -> fac_AMPA_D2
+# (donor code applies fac_AMPA_D2 to every AMPA_D2/AMPA_D3 synapse: PY-PY, PY-IN, TC-PY, TC-IN)
+ampa_cx_awake 0.133
+ampa_cx_n2    0.1938
+ampa_cx_n3    0.4332
+# AChAMPA 'from TC cells is 0.6, 0.72 and 1.2' -> fac_AMPA_TC
+# (donor code applies fac_AMPA_TC to class AMPA: TC-RE, PY-TC, PY-RE). Routing is an
+# interpretation -- see docs/wei2018_interpretations.md, item I1.
+ampa_th_awake 0.6
+ampa_th_n2    0.72
+ampa_th_n3    1.2
+# GABA 'from IN cells is 0.22, 0.264 and 0.44' -> fac_GABA_D2 (IN-PY)
+gaba_cx_awake 0.22
+gaba_cx_n2    0.264
+gaba_cx_n3    0.44
+# GABA 'from RE cells is 0.6, 0.72 and 1.2' -> fac_GABA_TC (RE-TC GABA_A/GABA_B, RE-RE)
+gaba_th_awake 0.6
+gaba_th_n2    0.72
+gaba_th_n3    1.2
