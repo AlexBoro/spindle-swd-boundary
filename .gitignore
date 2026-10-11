@@ -30,3 +30,7 @@ analysis/matlab_reference/intermediates/
 runs/
 *.npz
 running*.log
+# wei2018 build products
+model/wei2018/mindcurrent
+model/wei2018/generate_network
+model/wei2018/connection_info2

@@ -518,27 +518,14 @@ double AMPA_D3::calc_ampad3(double time, double v_post, int y_pre,int y_post) {
   // weight_max, weight_min are hard bounds for high and low values
 	
   double mini_stdp_factor=0.01;
-  double factor;
-  if(time<12000){
-    g_AMPA0=strength; 
-    if(time>11999){
-    	double Var = g_AMPA0/10;
-	double r3 = getGaussian2(Var);
-	g_AMPA0=strength+strength*r3;
-    }
-    weight_max=2*strength;
-    weight_min=0.00001*strength;
-    minis0=mini_s;
-  }
+  // donor: weights reset to 'strength' for time<12000, jittered at 11999<time<12000,
+  // and an if-chain over 15 test windows / the N3 block chose factor 0 / 0.75 / 1.
+  // Now: weights initialised serially in main (init_plastic_weights) and the
+  // per-step factor comes from the protocol (stdp_factor_now, protocol.h).
+  if(!initialised){ printf("AMPA_D3 used before init_plastic_weights\n"); exit(1); }
+  double factor = stdp_factor_now;
+  cP = stdp_cP;
 
- 
-  if((time>test1_start&&time<test1_end)||(time>test2_start&&time<test2_end)||(time>test3_start&&time<test3_end)||(time>test4_start&&time<test4_end)||(time>test5_start&&time<test5_end)||(time>test6_start&&time<test6_end)||(time>test7_start&&time<test7_end)||(time>test8_start&&time<test8_end)||(time>test9_start&&time<test9_end)||(time>test10_start&&time<test10_end)||(time>test11_start&&time<test11_end)||(time>test12_start&&time<test12_end)||(time>test13_start&&time<test13_end)||(time>test14_start&&time<test14_end)||(time>test15_start&&time<test15_end))
-    {factor=0;}
-  else if((time>awake_end&&time<stage3_end))
-    {factor=0.75;}
-  else {factor=1;}
-
-  
   //plasticity part
   if( ((time-spike_post) > 0) && y_post ){ //legit post spike has happend
     if(keyP==1) { //some pre spike has also happend
@@ -564,11 +551,7 @@ double AMPA_D3::calc_ampad3(double time, double v_post, int y_pre,int y_post) {
   }
 
 
-  if((time>seq1_trainingStart&&time<seq1_trainingEnd)||(time>seq2_trainingStart&&time<seq2_trainingEnd)||(time>seq3_trainingStart&&time<seq3_trainingEnd)){
-	cD = 0.001;
-  }else{
-	cD = 0.002;
-  }
+  cD = in_train_now ? stdp_cD_train : stdp_cD;   // donor: 0.001 in training, 0.002 otherwise
 
   if( ((time-spike_pre) > 0) && y_pre ) { //legit pre-spike has happend
     if(keyD==1) { // a post spike has happened before

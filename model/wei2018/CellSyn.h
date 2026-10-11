@@ -37,13 +37,8 @@ using namespace std;
 #define TAUr     25   //(TAU_Map/TAU)
 
 void print_spike_time(double time,int type,int m,int n);
+#include "protocol.h"
 extern double input_strength, input_start_neuron, input_end_neuron;
-extern int seq1_trainingStart, seq1_trainingEnd, seq2_trainingStart, seq2_trainingEnd, seq3_trainingStart, seq3_trainingEnd;
-extern int test1_start, test1_end, test2_start, test2_end, test3_start, test3_end, test4_start, test4_end;
-extern int test5_start, test5_end, test6_start, test6_end, test7_start, test7_end, test8_start, test8_end;
-extern int test9_start, test9_end, test10_start, test10_end, test11_start, test11_end, test12_start, test12_end;
-extern int test13_start, test13_end, test14_start, test14_end, test15_start, test15_end;
-extern int awake_end,stage3_end;
 
 //information about each cell as read from network file. CellSyn contain members relater rather to computation
 typedef struct{

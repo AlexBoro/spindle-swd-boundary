@@ -15,18 +15,7 @@
 #define PS 1 //Plasticity switch. 1 is ON and 0 is OFF
 #define HHH      0.02   
 
-// testing periods
-extern int test1_start, test1_end, test2_start, test2_end, test3_start, test3_end, test4_start, test4_end;
-extern int test5_start, test5_end, test6_start, test6_end, test7_start, test7_end, test8_start, test8_end;
-extern int test9_start, test9_end, test10_start, test10_end, test11_start, test11_end, test12_start, test12_end;
-extern int test13_start, test13_end, test14_start, test14_end, test15_start, test15_end;
-
-// training periods
-extern int seq1_trainingStart, seq1_trainingEnd, seq2_trainingStart, seq2_trainingEnd, seq3_trainingStart, seq3_trainingEnd;
-
-//awake to stage 3
-extern int awake_end;
-extern int stage3_end;
+#include "protocol.h"
 
 /// CX neuron -gKl
 extern double fac_gkl; 
@@ -724,7 +713,7 @@ public:
  double R, I, E, g1, old_v;
  AMPA_D2(Syn_Info *syn_info):Syn(syn_info)  {
    rand_buffer = new drand48_data;
-   static int seed = time2(NULL);
+   static int seed = time2(NULL) + 1000003*sim_seed;
    seed = seed + 100;
    srand48_r(seed,rand_buffer);
    old_v = 0;
@@ -770,9 +759,10 @@ class AMPA_D3:public Syn {
  public:
   double I, E, g1, g_AMPA0, g_AMPA00;
   double weight_max,weight_min,minis0;
+  int initialised;   // set by init_plastic_weights() in main.cpp
   AMPA_D3(Syn_Info *syn_info):Syn(syn_info)  {
     rand_buffer = new drand48_data;
-    static int seed = time2(NULL);
+    static int seed = time2(NULL) + 1000003*sim_seed;
     seed = seed+100;
     srand48_r(seed,rand_buffer);
     R = 0, C = 0, R0 = 0, R1 = 0;
@@ -795,6 +785,7 @@ class AMPA_D3:public Syn {
     cP=0.002;
     cD=0.002;
     keyP=0, keyD=0;
+    initialised=0;
 }
   void iii(unsigned int seek) {
   }
@@ -856,7 +847,7 @@ public:
  double I, E_GABA, E, g1,old_v;
  GABA_A_D2(Syn_Info *syn_info):Syn(syn_info)  {
    rand_buffer = new drand48_data;
-   static int seed = time2(NULL);
+   static int seed = time2(NULL) + 1000003*sim_seed;
    seed = seed + 103;
    srand48_r(seed,rand_buffer);
    old_v = 0;
@@ -892,7 +883,7 @@ class AMPAmapD1:public Syn {
   double I, g, old_v;
   AMPAmapD1(Syn_Info *syn_info):Syn(syn_info)  {
     rand_buffer = new drand48_data;
-    static int seed = time2(NULL);
+    static int seed = time2(NULL) + 1000003*sim_seed;
     seed = seed + 102;
     srand48_r(seed,rand_buffer);
     old_v = 0;

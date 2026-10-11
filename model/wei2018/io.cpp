@@ -1,6 +1,7 @@
 #include "io.h"
 #include <sstream>
 #include "params.h"
+#include "protocol.h"
 #include <string.h>
 
 double print_receive(int m , int n, enum Cell_Type type); 
@@ -50,6 +51,22 @@ void load_input_params(
   add_double_param(  homeo_target_f   );
   add_int_param(  homeo_fre_window    );
   add_int_param(  homeo_num_regions   );
+
+  // protocol / Wei 2018 knobs (protocol.h)
+  add_int_param(sim_seed);
+  add_double_param(stim_period); add_double_param(stim_spacing); add_double_param(stim_pulse);
+  add_double_param(stdp_cP); add_double_param(stdp_cD); add_double_param(stdp_cD_train);
+  add_double_param(stdp_factor_n2); add_double_param(stdp_factor_n3);
+  add_double_param(plasticity_start); add_double_param(weight_dt); add_double_param(lfp_dt);
+  add_int_param(weight_jitter);
+  add_double_param(gkl_cx_awake); add_double_param(gkl_cx_n2); add_double_param(gkl_cx_n3);
+  add_double_param(gkl_tc_awake); add_double_param(gkl_tc_n2); add_double_param(gkl_tc_n3);
+  add_double_param(gkl_re_awake); add_double_param(gkl_re_n2); add_double_param(gkl_re_n3);
+  add_double_param(gh_tc_awake); add_double_param(gh_tc_n2); add_double_param(gh_tc_n3);
+  add_double_param(ampa_cx_awake); add_double_param(ampa_cx_n2); add_double_param(ampa_cx_n3);
+  add_double_param(ampa_th_awake); add_double_param(ampa_th_n2); add_double_param(ampa_th_n3);
+  add_double_param(gaba_cx_awake); add_double_param(gaba_cx_n2); add_double_param(gaba_cx_n3);
+  add_double_param(gaba_th_awake); add_double_param(gaba_th_n2); add_double_param(gaba_th_n3);
 
   add_double_param(input_strength);
   add_double_param(input_start_neuron);

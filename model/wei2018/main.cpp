@@ -6,6 +6,9 @@
 #include "CellSyn.h"    //header for all classes describing currents and basic cell types
 #include "io.h"
 #include "network.h"
+#include "protocol.h"
+#include <vector>
+#include "bmalgo.h"
 
 int num_mp_threads; //number of openMP threads
 
@@ -55,95 +58,7 @@ int *mapns, *hhns;
 int mapi,hhi;
 
 int one_state=0;
-int test_duration=50000;
-int seq1_duration=250000;
-int seq2_duration=250000;
-int seq3_duration=300000;
-int n3_duration=1000000;
-
-//--- test baselines ---//
-// test seq1 baseline
-int test1_start=12001;
-int test1_end=test1_start+test_duration-1;
-
-// test seq2 baseline;
-int test2_start = test1_end+1;
-int test2_end = test2_start+test_duration-1;
-
-// test seq3 baseline
-int test3_start = test2_end+1;
-int test3_end = test3_start+test_duration-1;
-
-//--- traing sequence 1 ---//
-// sequence 1 training
-int seq1_trainingStart=test3_end+1;
-int seq1_trainingEnd=seq1_trainingStart+seq1_duration-1;
-
-//--- tests after sequence 1 training ---//
-// test seq1
-int test4_start = seq1_trainingEnd+1;
-int test4_end = test4_start+test_duration-1;
-
-// test seq2
-int test5_start = test4_end+1;
-int test5_end = test5_start+test_duration-1;
-
-// test seq3
-int test6_start = test5_end+1;
-int test6_end = test6_start+test_duration-1;
-
-//--- training sequence 2 ---//
-// sequence 2 training
-int seq2_trainingStart=test6_end+1;
-int seq2_trainingEnd=seq2_trainingStart+seq2_duration-1;
-
-//--- tests after sequence 2 training ---//
-// test seq1
-int test7_start = seq2_trainingEnd+1;
-int test7_end = test7_start+test_duration-1;
-
-// test seq2
-int test8_start = test7_end+1;
-int test8_end = test8_start+test_duration-1;
-
-// test seq3
-int test9_start = test8_end+1;
-int test9_end = test9_start+test_duration-1;
-
-//--- training sequence 3 ---//
-// sequence 3 training
-int seq3_trainingStart = test9_end+1;
-int seq3_trainingEnd = seq3_trainingStart+seq3_duration-1;
-
-//--- tests after sequence 3 training ---//
-// test seq1
-int test10_start = seq3_trainingEnd+1;
-int test10_end = test10_start+test_duration-1;
-
-// test seq2
-int test11_start = test10_end+1;
-int test11_end = test11_start+test_duration-1;
-
-// test seq3
-int test12_start = test11_end+1;
-int test12_end = test12_start+test_duration-1;
-
-//--- sleep ---//
-int awake_end = test12_end+1;
-int stage3_end=awake_end+n3_duration;
-
-//--- test after sleep ---//
-// test seq1
-int test13_start = stage3_end+1;
-int test13_end = test13_start+test_duration-1;
-
-// test seq2
-int test14_start = test13_end+1;
-int test14_end = test14_start+test_duration-1;
-
-// test seq3
-int test15_start = test14_end+1;
-int test15_end = test15_start+test_duration-1;
+// (donor timeline globals test*_start ... stage3_end removed: see protocol.h)
 
 /// CX neuron -gKl
 double fac_gkl; 
@@ -390,9 +305,9 @@ extern FILE *f28;
 
 void load_input_data(int argc, char *argv[]){ 
   //checks inputs
-  if (argc < 4) {
+  if (argc < 5) {
     puts("Bad command: Should be");
-    puts("input_file_name output_directory connections_file_name");
+    puts("input_file_name output_directory connections_file_name protocol_file");
     exit(1);
   }
   output_location = argv[2];
@@ -431,6 +346,73 @@ double linear_change(double start_value, double tdiff, double end_value){
 
 FILE *fmanipulations;
 
+
+// ---------------- initial weights and compact binary recorder ----------------
+// Donor applied a Gaussian jitter to each AMPA_D3 weight inside the parallel
+// region at t in (11999,12000) using the global rand(), so the draw order (and
+// hence the weights) depended on thread scheduling.  Same formula, drawn
+// serially in cell order before the first step.
+void init_plastic_weights(){
+  for(int i=0; i<num_cells; i++)
+    for(int k=0; k<cells[i]->num_syns; k++)
+      if(cells[i]->syns[k]->type==E_AMPA_D3){
+        AMPA_D3 *s=(AMPA_D3*)cells[i]->syns[k];
+        s->g_AMPA0 = s->strength;
+        if(weight_jitter){ double Var = s->g_AMPA0/10; double r3 = getGaussian2(Var); s->g_AMPA0 = s->strength + s->strength*r3; }
+        s->weight_max = 2*s->strength;
+        s->weight_min = 0.00001*s->strength;
+        s->minis0 = s->mini_s;
+        s->initialised = 1;
+      }
+}
+
+static FILE *f_lfp=NULL, *f_w=NULL, *f_mini=NULL;
+void recorder_step(int ii, double t);
+static std::vector<AMPA_D3*> rec_syn;
+static int lfp_every=0, w_every=0;
+
+void recorder_open(){
+  FILE *fi=fopen((output_location+"weights_index.txt").c_str(),"w");
+  fprintf(fi,"# pre_PY post_PY  (row order of weights_g.f32 / weights_mini.f32 after the time column)\n");
+  for(int i=0; i<num_cells; i++)
+    if(cells[i]->type==E_CX)
+      for(int k=0; k<cells[i]->num_syns; k++)
+        if(cells[i]->syns[k]->type==E_AMPA_D3){
+          rec_syn.push_back((AMPA_D3*)cells[i]->syns[k]);
+          fprintf(fi,"%d %d\n", cells[cells[i]->syns[k]->from_cell]->m, cells[i]->m);
+        }
+  fclose(fi);
+  if(lfp_dt>0){ f_lfp=fopen((output_location+"lfp.f32").c_str(),"wb"); lfp_every=(int)(lfp_dt/TAU+0.5); }
+  if(weight_dt>0){ f_w=fopen((output_location+"weights_g.f32").c_str(),"wb");
+                   f_mini=fopen((output_location+"weights_mini.f32").c_str(),"wb"); w_every=(int)(weight_dt/TAU+0.5); }
+}
+void recorder_initial_snapshot(){ recorder_step(-1, 0.0); }   // weights at t = 0
+
+// columns of lfp.f32: t, mean PY soma V, mean IN soma V, mean TC V, mean RE V
+void recorder_step(int ii, double t){
+  if(f_lfp && ii>=0 && ii%lfp_every==0){
+    double sum[4]={0,0,0,0}; int n[4]={0,0,0,0};
+    for(int i=0;i<num_cells;i++){
+      int ty=cells[i]->type, c=-1;
+      if(ty==E_CX)c=0; else if(ty==E_IN)c=1; else if(ty==E_TC)c=2; else if(ty==E_RE)c=3;
+      if(c<0) continue;
+      sum[c]+=cells[i]->base_cell->get_v_soma(); n[c]++;
+    }
+    float row[5]; row[0]=(float)(t+TAU);   // state after this step
+    for(int c=0;c<4;c++) row[c+1]=(float)(n[c]?sum[c]/n[c]:0.0);
+    fwrite(row,sizeof(float),5,f_lfp);
+  }
+  if(f_w && (ii<0 || ii%w_every==0)){
+    std::vector<float> g(rec_syn.size()+1), mn(rec_syn.size()+1);
+    g[0]=mn[0]=(float)(ii<0 ? t : t+TAU);
+    for(size_t k=0;k<rec_syn.size();k++){ g[k+1]=(float)rec_syn[k]->g_AMPA0; mn[k+1]=(float)rec_syn[k]->mini_s; }
+    fwrite(&g[0],sizeof(float),g.size(),f_w);
+    fwrite(&mn[0],sizeof(float),mn.size(),f_mini);
+  }
+}
+
+void recorder_close(){ if(f_lfp)fclose(f_lfp); if(f_w)fclose(f_w); if(f_mini)fclose(f_mini); }
+
 //+++++++++++++++++++ MAIN PROGRAM +++++++++++++++++++++++++++++++++++++++++++
 int main(int argc,char **argv){
 
@@ -439,14 +421,17 @@ int main(int argc,char **argv){
   load_input_data(argc,argv);
   load_input_params(argc,argv,tmax,t3D,ttime,num_mp_threads,print_c_sten,fre_print_cs,LFP.local_field_effect,LFP.lfp_scale,LFP.num_field_layers,homeo.boost,homeo.amp_boost,homeo.con_boost,homeo.fre_boost,homeo.target_f,homeo.fre_window,homeo.num_regions,input_strength,input_start_neuron,input_end_neuron, block_size);
 
-  // seed random number generator with current second of execution
-  srand(2000);
+  // donor: srand(2000).  sim_seed = 0 reproduces it; other seeds shift every
+  // RNG (cell leak heterogeneity here, mini-EPSP streams in currents.h, jitter).
+  protocol.load(argv[4]);
+  srand(2000 + sim_seed);
 
   homeo.allocate();
 
   initialize_cells(cells);
 
   scale_synapses(cells, num_cells);
+  init_plastic_weights();
 
   LFP.init();
   open_files(output_location,LFP.field_file,LFP.num_field_layers);
@@ -474,88 +459,28 @@ int main(int argc,char **argv){
   time_t start_time = time(NULL);
   printf("root set up tau:%lf time:%lf tmax:%lf\n",TAU,t,tmax);
 
-  double s3_scale=2.0;
-
-  /// gKl 
-  double gkl_awake_fix     = 0.19; 
-  double gkl_s3            = gkl_awake_fix*s3_scale;
-
-  double gkl_TC_awake_fix  = 0.8;
-  double gkl_TC_s3         = gkl_TC_awake_fix*s3_scale;
-
-  double gkl_RE_awake_fix  = 0.9;
-  double gkl_RE_s3         = gkl_RE_awake_fix*((2-s3_scale/2)-0.5);
-
-  double awake_AMPAd2_fix  =0.19; //wake_ach_fac;
-  double s3_AMPAd2         =awake_AMPAd2_fix*s3_scale*1.28;
-
-  double gh_TC_awake       =-8.0;
-  double gh_TC_s3          =-1.0;
-
-  double awake_GABAd2_fix  =0.22;
-  double s3_GABAd2         =awake_GABAd2_fix*s3_scale;
-
-  double awake_GABA_TC_fix =0.6; //awake_gaba_fac;
-  double s3_GABA_TC        =awake_GABA_TC_fix*s3_scale; 
-
-  fmanipulations = fopen("manipulation.txt","w");
-
-  double awake_AMPA_TC     =0.5; //awake_ach_fac;
-  double s3_AMPA_TC        =0.5;  
-
-  double gk_cx_slow_awake  = 1.0; 
-  double gk_cx_slow_s3     = 1.0; 
-
-  double gk_cx_spike_awake = 1.0;
-  double gk_cx_spike_s3    = 1.0;
-
+  check_state_table();
+  FILE *fproto = fopen((output_location+"protocol_used.txt").c_str(), "w");
+  protocol.dump(fproto); fclose(fproto);
+  fmanipulations = fopen((output_location+"manipulation.txt").c_str(),"w");
+  recorder_open();
+  recorder_initial_snapshot();
 
   print_connectivity(cell_sizes);
 
   while( t < tmax){
     total_rec = 0;
 
-    if ((t<=awake_end)){
-
-      // Fix all values for awake state
-      fac_AMPA_D2 = awake_AMPAd2_fix*0.7;
-      fac_AMPA_TC = awake_AMPA_TC;
-      fac_GABA_D2 = awake_GABAd2_fix;
-      fac_GABA_TC = awake_GABA_TC_fix;
-      fac_gkl_RE  = gkl_RE_awake_fix;
-      fac_gkl_TC  = gkl_TC_awake_fix*0.5;
-      fac_gkl     = gkl_awake_fix*0.7;
-      fac_gh_TC   = gh_TC_awake*3;
-      fac_gkca_cx = gk_cx_slow_awake;
-      fac_gkm_cx  = gk_cx_slow_awake;
-      fac_gkv_cx  = gk_cx_spike_awake;
-
-    }else if ((t>awake_end&&t<=stage3_end)){ 
-      // Fix all values for S3
-      fac_AMPA_D2 = s3_AMPAd2;
-      fac_AMPA_TC = s3_AMPA_TC;
-      fac_GABA_D2 = s3_GABAd2;
-      fac_GABA_TC = s3_GABA_TC;
-      fac_gkl_RE  = gkl_RE_s3;
-      fac_gkl_TC  = gkl_TC_s3;
-      fac_gkl     = gkl_s3;
-      fac_gh_TC   = gh_TC_s3;
-      fac_gkca_cx = gk_cx_slow_s3;
-      fac_gkm_cx  = gk_cx_slow_s3;
-      fac_gkv_cx  = gk_cx_spike_s3;
-    }
-    else { //awake after sleep
-      fac_AMPA_D2 = awake_AMPAd2_fix*0.7;
-      fac_AMPA_TC = awake_AMPA_TC;
-      fac_GABA_D2 = awake_GABAd2_fix;
-      fac_GABA_TC = awake_GABA_TC_fix;
-      fac_gkl_RE  = gkl_RE_awake_fix;
-      fac_gkl_TC  = gkl_TC_awake_fix*0.5;
-      fac_gkl     = gkl_awake_fix*0.7;
-      fac_gh_TC   = gh_TC_awake*3;
-      fac_gkca_cx = gk_cx_slow_awake;
-      fac_gkm_cx  = gk_cx_slow_awake;
-      fac_gkv_cx  = gk_cx_spike_awake;
+    // vigilance state, STDP gate and training flag for this step (protocol.h)
+    {
+      int st = protocol.state_at(t);
+      apply_state(st);
+      double f = (st == ST_AWAKE) ? 1.0 : (st == ST_N2 ? stdp_factor_n2 : stdp_factor_n3);
+      if (t < plasticity_start || protocol.in_test(t)) f = 0.0;
+      stdp_factor_now = f;
+      in_train_now = 0;
+      for (size_t w = 0; w < protocol.wins.size(); w++)
+        if (!protocol.wins[w].is_test && t >= protocol.wins[w].t0 && t < protocol.wins[w].t1) in_train_now = 1;
     }
 
     if(t>print_count){
@@ -609,6 +534,7 @@ int main(int argc,char **argv){
       homeo.boost_activity(cell_sizes,cells,num_cells); //causes homeostatic changes
     }
 
+    recorder_step(ii, t);
     t = t + TAU; //increase time
   } //end while loop
 
@@ -616,5 +542,6 @@ int main(int argc,char **argv){
   close_files(LFP.field_file,LFP.num_field_layers);
 
   fclose(fmanipulations);
+  recorder_close();
   return 0;
 }
