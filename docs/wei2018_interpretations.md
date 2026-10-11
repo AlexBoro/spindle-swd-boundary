@@ -62,10 +62,15 @@ matches the table; the PY base does not. *Choice:* code. Every other Table 1
 entry matches the code (gNa, gK, gT, gh, K-leak, E_L, areas, rho,
 dendritic gNa/gNap/gHVA/gKCa/gKm, somatic gNa/gKv/gNap).
 
-**I6. mEPSP amplitude.** The paper gives 0.2 mV for PY-PY, PY-IN and IN-PY minis;
-the code specifies mini *conductances* (`Mini_s` 0.0003, 0.0002, 0.0002, scaled
-by fan-in). *Choice:* donor values. *Gate check:* awake PY rate ~0.6 Hz
-(S4B Fig). The paper raised it to 1.7 Hz by going from 0.2 to 0.3 mV, i.e. x1.5.
+**I6. mEPSP amplitude -- RESOLVED by the physiology gate.** The paper gives
+A = 0.2 mV for PY-PY, PY-IN and IN-PY alike; the donor's `Mini_s` was 0.0003 for
+PY-PY but 0.0002 for PY-IN and IN-PY. The as-vendored value gave an awake PY rate
+of 1.84 Hz against the paper's ~0.6 Hz (S4B). Setting PY-PY `Mini_s` to 0.0002
+(equal to the other two, as the paper states) gives **0.70 Hz**. The paper's own
+manipulation (0.2 -> 0.3 mV raises the rate to ~1.7 Hz, S4C) matches the
+0.0002 -> 0.0003 contrast measured here (0.70 -> 1.84 Hz) on both points, so
+the code's `Mini_s` x 1000 corresponds to the paper's mV label. Adopted in commit
+"PY-PY mini amplitude"; see docs/wei2018_gate.md.
 
 **I7. Warm-up and test windows.** The donor holds weights fixed for its first 12 s
 and freezes STDP during test windows (factor 0). The paper mentions neither.
