@@ -28,7 +28,7 @@ meta["src_sha256"] = hashlib.sha256(open(src, "rb").read()).hexdigest()
 if os.path.exists(os.path.join(work, "GIT_SHA")):
     meta["git_sha"] = open(os.path.join(work, "GIT_SHA")).read().strip()
 meta["gxx"] = subprocess.run(["g++", "--version"], capture_output=True, text=True).stdout.splitlines()[0]
-subprocess.run(["make", "-s", "mindcurrent"], cwd=M, check=True)
+subprocess.run("make -s mindcurrent > build.log 2>&1 || (cat build.log; exit 1)", shell=True, cwd=M, check=True)
 subprocess.run("g++ -O2 generate_network.cpp -o generate_network 2>/dev/null && "
                "./generate_network > connection_info2 2>gen.log", shell=True, cwd=M, check=True)
 meta["binary_sha256"] = hashlib.sha256(open(os.path.join(M, "mindcurrent"), "rb").read()).hexdigest()
