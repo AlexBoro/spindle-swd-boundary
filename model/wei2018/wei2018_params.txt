@@ -1,0 +1,76 @@
+#Wei et al. 2018 reproduction -- base parameter file.
+#Derived from the donor params.txt (tmax, t3D, ttime, num_mp_threads changed:
+#t3D/ttime = 1e12 disables the donor's large text voltage dumps; the binary
+#recorder in main.cpp replaces them). Wei-specific values are appended below,
+#each block added in its own commit. tmax and num_mp_threads are normally
+#overridden per run on the command line (-tmax ..., -num_mp_threads ...).
+#Parameters for simulation.
+#New param has to be added to io.h/cpp
+
+#tmax how long the program runs(millisec)
+tmax 550000
+
+#t3d when to start prints
+t3D 1e12
+
+#ttime also has to do with when to start prints
+ttime 1e12
+
+#num_mp_threads number of openMP threads (ignored for mpi runs)
+num_mp_threads 8
+
+#print_c_sten if 1 prints all the connection strengths for cx every once in awile (note this only works with openmp)
+print_c_sten 0
+
+#fre_print_cs how often to print connection strengths(every how many milliseconds)
+fre_print_cs 10
+
+#local_field_effect turn to 1 to turn it on. (only works with openmp)
+LFP_local_field_effect 0
+
+#lfp_scale how much to scale field by
+LFP_lfp_scale 8.1390544539e-05
+
+#num_field_layers how many field layers to calc be careful with this 
+LFP_num_field_layers 8
+
+#boost 1 for homeostasis on 0 for off
+homeo_boost 0
+
+#amp_boost how much to boost mini amp by
+homeo_amp_boost 0.0
+
+#con_boost how much to boost cx*->cx* connection s by
+homeo_con_boost 0.0
+
+#fre_boost how much to boost mini fre by
+homeo_fre_boost 0.0
+
+#target_f target frequency for firing
+homeo_target_f 0.015
+
+#fre_window time steps for freqency tracking window 50 time steps per millisecond with tau at 0.02
+homeo_fre_window 10000000
+
+# what percent of the network should be cut at. 0-1.0 not inclusive now in create connections
+homeo_num_regions 100
+
+# input strength
+input_strength 1.2
+
+# input start neuron
+input_start_neuron 199
+
+# input end neuron
+input_end_neuron 208
+
+
+# chunk size for openmp
+block_size 13
+
+# ---------------- run control (protocol.h) ----------------
+sim_seed 0
+plasticity_start 12000
+weight_dt 1000
+lfp_dt 1
+weight_jitter 1
