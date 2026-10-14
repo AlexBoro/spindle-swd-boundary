@@ -60,6 +60,9 @@ meta["args"] = args
 tag = " ".join(extra + cfg_over)
 run_id = f"{proto}_s{seed}" + ("_" + hashlib.sha1(tag.encode()).hexdigest()[:6] if tag else "")
 raw = os.path.abspath("raw"); os.makedirs(raw, exist_ok=True)
+if os.environ.get("WEI_PERSIST_DIR"):
+    _d = os.path.join(os.environ["WEI_PERSIST_DIR"], run_id); os.makedirs(_d, exist_ok=True)
+    json.dump(meta, open(os.path.join(_d, "STARTED.json"), "w"))
 t0 = time.time()
 with open("sim_stdout.log", "w") as so, open("sim_stderr.log", "w") as se:
     rc = subprocess.run([os.path.join(M, "mindcurrent"), os.path.join(M, "wei2018_params.txt"),
@@ -98,4 +101,15 @@ json.dump(meta, open(os.path.join("out", run_id + ".json"), "w"), indent=1)
 for f in ["sim_stdout.log", "sim_stderr.log"]:
     lines = open(f).read().splitlines()
     open(os.path.join("out", run_id + "_" + f), "w").write("\n".join(lines[:80] + ["..."] + lines[-40:]))
+# persist to a Modal Volume (or any directory) named by WEI_PERSIST_DIR, so results
+# survive even if the host is offline when the job ends and the harvest never happens
+pdir = os.environ.get("WEI_PERSIST_DIR")
+if pdir:
+    import shutil
+    dst = os.path.join(pdir, run_id); os.makedirs(dst, exist_ok=True)
+    for f in os.listdir("out"):
+        if f.startswith(run_id):
+            shutil.copy2(os.path.join("out", f), os.path.join(dst, f))   # copy2: /work -> /vol is cross-device
+    open(os.path.join(dst, "PERSISTED"), "w").write(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    print("PERSISTED", dst, flush=True)
 print("DONE", run_id, "spikes", len(sp), "lfp", d["lfp"].shape, "w", d["w_g"].shape, flush=True)
