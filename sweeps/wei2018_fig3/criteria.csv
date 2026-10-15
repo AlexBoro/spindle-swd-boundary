@@ -1,0 +1,19 @@
+id,claim,measured,paper,verdict,note
+F2E.1,training raises recall above baseline,15.2 +/- 1.1 (n=20) -> 18.4 +/- 0.8 (n=20),13.8 -> 22.6 %,PASS,paired t p=0.046
+F3C.n2n3,recall after n2n3 vs after training,18.4 +/- 1.7 (n=5) -> 26.0 +/- 2.6 (n=5),22.6 -> 49.0 %,FAIL,paired t p=0.053; paper: increase
+F3B.n2n3,synaptic change after training -> after n2n3,24.7 +/- 0.2 (n=5) -> 43.5 +/- 1.8 (n=5),25.0 -> 53.0 %,INFO,
+F3C.awake,recall after awake vs after training,18.4 +/- 1.7 (n=5) -> 26.4 +/- 1.0 (n=5),22.6 -> 24.0 %,FAIL,paired t p=0.022; paper: n.s.
+F3B.awake,synaptic change after training -> after awake,24.7 +/- 0.2 (n=5) -> 25.2 +/- 0.2 (n=5),25.0 -> 27.0 %,INFO,
+F3C.n2,recall after n2 vs after training,18.4 +/- 1.7 (n=5) -> 23.2 +/- 1.4 (n=5),22.6 -> 30.0 %,PASS,paired t p=0.033; paper: increase
+F3B.n2,synaptic change after training -> after n2,24.7 +/- 0.2 (n=5) -> 29.4 +/- 1.0 (n=5),25.0 -> 35.0 %,INFO,
+F3C.n3,recall after n3 vs after training,18.4 +/- 1.7 (n=5) -> 40.0 +/- 3.3 (n=5),22.6 -> 64.0 %,PASS,paired t p=0.0071; paper: increase
+F3B.n3,synaptic change after training -> after n3,24.7 +/- 0.2 (n=5) -> 54.7 +/- 2.2 (n=5),25.0 -> 65.0 %,INFO,
+F3C.order,recall gain N3 > N2+N3 > N2 > awake,n3 +21.6 / n2n3 +7.6 / n2 +4.8 / awake +8.0,n3 +41 / n2n3 +26 / n2 +7 / awake +1,FAIL,the paper's ordering; strict n2n3 position not required
+F3E.1,fraction of correct replay higher in every sleep condition than awake,n2n3 0.46 / awake 0.02 / n2 0.31 / n3 0.48,n2n3 ~0.42 / awake 0 / n2 ~0.2 / n3 ~0.47,PASS,
+F3E.2,more correct replays in N3-only than N2-only,n3 1023 vs n2 131,N3 > N2,PASS,
+F3C.n2n3-vs-awake,"final recall, n2n3 minus awake (same seed)",-0.4 +/- 3.1 (n=5),+25 % (from figure),FAIL,paired t p=0.9
+F3B.n2n3-vs-awake,"trained-direction weight change, n2n3 minus awake (same seed)",+18.3 +/- 1.8 (n=5),+26 % (from figure),PASS,paired t p=0.00052
+F3C.n2-vs-awake,"final recall, n2 minus awake (same seed)",-3.2 +/- 2.2 (n=5),+6 % (from figure),FAIL,paired t p=0.23
+F3B.n2-vs-awake,"trained-direction weight change, n2 minus awake (same seed)",+4.2 +/- 0.8 (n=5),+8 % (from figure),PASS,paired t p=0.0066
+F3C.n3-vs-awake,"final recall, n3 minus awake (same seed)",+13.6 +/- 3.2 (n=5),+40 % (from figure),PASS,paired t p=0.014
+F3B.n3-vs-awake,"trained-direction weight change, n3 minus awake (same seed)",+29.5 +/- 2.3 (n=5),+38 % (from figure),PASS,paired t p=0.00023

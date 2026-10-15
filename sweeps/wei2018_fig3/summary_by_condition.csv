@@ -1,0 +1,5 @@
+condition,n,perf_before,perf_after_train,perf_after_sleep,dw_after_train,dw_after_sleep,replay_frac,replay_correct,replay_reversed
+awake,5,15.2,18.4,26.4,24.73,25.19,0.02,2.8,1.0
+n2,5,15.2,18.4,23.2,24.73,29.41,0.31,131.2,64.2
+n2n3,5,15.2,18.4,26.0,24.73,43.54,0.46,615.0,83.6
+n3,5,15.2,18.4,40.0,24.73,54.73,0.48,1022.8,116.8

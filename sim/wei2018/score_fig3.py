@@ -40,6 +40,9 @@ def score_run(path, cond):
            "dw_after_sleep": dw_at(SLEEP[1]), "dw_end": float(fwd[-1]),
            "dw_rev_after_sleep": float(rev[np.argmin(np.abs(t - SLEEP[1]))]),
            "awake_py_rate": W.rate(d, W.PY, W0 + 150000, W0 + 200000, 500)}
+    for nm, r_ in zip(["before", "after_train", "after_sleep"], rec):
+        out[f"perf_{nm}_first25"] = 100 * float(np.mean(r_["sm"][:25] >= 0.8))
+        out[f"perf_{nm}_last25"] = 100 * float(np.mean(r_["sm"][25:] >= 0.8))
     rp = W.replay_summary(d, 1, *SLEEP)
     out.update({f"replay_{k}": v for k, v in rp.items()})
     if cond == "n2n3":
@@ -113,6 +116,25 @@ def main(runs_csv, out_dir):
         add("F3E.2", "more correct replays in N3-only than N2-only",
             f"n3 {np.mean([s['replay_n_correct'] for s in by['n3']]):.0f} vs n2 {np.mean([s['replay_n_correct'] for s in by['n2']]):.0f}",
             "N3 > N2", "PASS" if np.mean([s['replay_n_correct'] for s in by['n3']]) > np.mean([s['replay_n_correct'] for s in by['n2']]) else "FAIL")
+    # Paired by seed against the awake control. Runs with the same seed are bit-identical
+    # until sleep onset (same seed, same protocol up to t = 200 s), so the final test
+    # differs ONLY by what happened during the 300 s block. This controls for test-history
+    # effects (recall drifts with time since the last stimulation; see within-session columns).
+    aw = {s_["seed"]: s_ for s_ in by["awake"]}
+    for c in ["n2n3", "n2", "n3"]:
+        pairs = [(s_, aw[s_["seed"]]) for s_ in by[c] if s_["seed"] in aw]
+        if len(pairs) < 2:
+            continue
+        a = np.array([q["perf_after_sleep"] for q, _ in pairs]); b = np.array([r["perf_after_sleep"] for _, r in pairs])
+        p = stats.ttest_rel(a, b).pvalue
+        add(f"F3C.{c}-vs-awake", f"final recall, {c} minus awake (same seed)", f"{np.mean(a-b):+.1f} +/- {np.std(a-b, ddof=1)/np.sqrt(len(a)):.1f} (n={len(a)})",
+            f"{TARGET['perf_after_sleep'][c] - TARGET['perf_after_sleep']['awake']:+.0f} % (from figure)",
+            "PASS" if (np.mean(a - b) > 0 and p < 0.05) else "FAIL", f"paired t p={p:.2g}")
+        a = np.array([q["dw_after_sleep"] for q, _ in pairs]); b = np.array([r["dw_after_sleep"] for _, r in pairs])
+        p = stats.ttest_rel(a, b).pvalue
+        add(f"F3B.{c}-vs-awake", f"trained-direction weight change, {c} minus awake (same seed)", f"{np.mean(a-b):+.1f} +/- {np.std(a-b, ddof=1)/np.sqrt(len(a)):.1f} (n={len(a)})",
+            f"{TARGET['dw_after_sleep'][c] - TARGET['dw_after_sleep']['awake']:+.0f} % (from figure)",
+            "PASS" if (np.mean(a - b) > 0 and p < 0.05) else "FAIL", f"paired t p={p:.2g}")
     with open(os.path.join(out_dir, "criteria.csv"), "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=["id", "claim", "measured", "paper", "verdict", "note"])
         w.writeheader(); w.writerows(crit)
