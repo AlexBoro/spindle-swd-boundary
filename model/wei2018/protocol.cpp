@@ -47,8 +47,15 @@ void Protocol::load(const char *path) {
       seqs.push_back(q);
     } else if (kw == "train" || kw == "test") {
       StimWin w; w.is_test = (kw == "test");
-      if (!(ss >> w.seq >> w.t0 >> w.t1 >> w.phase)) die(kw + " <id> <t0> <t1> <phase>", ln);
+      if (!(ss >> w.seq >> w.t0 >> w.t1 >> w.phase)) die(kw + " <id> <t0> <t1> <phase> [amp]", ln);
+      if (!(ss >> w.amp)) w.amp = -1.0;   // -1: use input_strength
       wins.push_back(w);
+    } else if (kw == "weights") {
+      if (!(ss >> weights_path)) die("weights <file>", ln);
+      if (weights_path[0] != '/') {
+        std::string p(path); size_t sl = p.rfind('/');
+        if (sl != std::string::npos) weights_path = p.substr(0, sl + 1) + weights_path;
+      }
     } else die("unknown directive " + kw, ln);
   }
   // validation: state blocks contiguous from 0
@@ -70,8 +77,9 @@ void Protocol::dump(FILE *f) const {
     fprintf(f, "\n");
   }
   for (size_t i = 0; i < wins.size(); i++)
-    fprintf(f, "%s %d %.3f %.3f %.3f\n", wins[i].is_test ? "test" : "train",
-            wins[i].seq, wins[i].t0, wins[i].t1, wins[i].phase);
+    fprintf(f, "%s %d %.3f %.3f %.3f %.4f\n", wins[i].is_test ? "test" : "train",
+            wins[i].seq, wins[i].t0, wins[i].t1, wins[i].phase, wins[i].amp);
+  if (!weights_path.empty()) fprintf(f, "weights %s\n", weights_path.c_str());
 }
 
 const SeqDef *Protocol::find_seq(int id) const {
@@ -105,7 +113,7 @@ double Protocol::stim(int m, double x) const {
     for (int g = 0; g < ng; g++) {
       double on = g * stim_spacing;
       if (st >= on && st < on + stim_pulse && m >= q->starts[g] && m < q->starts[g] + q->size)
-        I += input_strength;
+        I += (w.amp >= 0 ? w.amp : input_strength);
     }
   }
   return I;

@@ -18,6 +18,15 @@
 //                                       [j*spacing, j*spacing+pulse)
 //   test    <id> <t0> <t1> <phase>      as train, but only group 1 is driven, and
 //                                       STDP is frozen for the whole window
+//   train/test take an optional 5th field <amp>: stimulus current for that window
+//                                       (default: the input_strength param)
+//   weights <file>                      after the initial weights are set (and the
+//                                       jitter draws consumed, so every RNG stream is
+//                                       unchanged), overwrite every PY-PY AMPA_D3 weight
+//                                       and mini amplitude from <file>, one line
+//                                       'pre post g mini' per synapse in the order of
+//                                       weights_index.txt.  Relative paths resolve
+//                                       against the protocol file's directory.
 //
 // Timing knobs are params (stim_period, stim_spacing, stim_pulse, input_strength).
 #ifndef WEI_PROTOCOL_H
@@ -30,12 +39,13 @@ enum VigState { ST_AWAKE = 0, ST_N2 = 1, ST_N3 = 2 };
 
 struct StateBlock { double t0, t1; int state; };
 struct SeqDef { int id; int size; std::vector<int> starts; };
-struct StimWin { int seq; double t0, t1, phase; int is_test; };
+struct StimWin { int seq; double t0, t1, phase; int is_test; double amp; };
 
 struct Protocol {
   std::vector<StateBlock> states;
   std::vector<SeqDef> seqs;
   std::vector<StimWin> wins;
+  std::string weights_path;   // empty = keep the initial weights
   void load(const char *path);
   void dump(FILE *f) const;
   int state_at(double t) const;

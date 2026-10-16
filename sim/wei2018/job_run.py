@@ -17,7 +17,10 @@ import hashlib, json, os, re, subprocess, sys, tarfile, time
 import numpy as np
 
 src, proto, seed, threads = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-extra = [a for a in sys.argv[5:] if not a.startswith("@")]
+extra = [a for a in sys.argv[5:] if not a.startswith(("@", "%"))]
+# '%FILE' copies a 'pre post g mini' weight file to protocols/weights.txt, where the
+# protocol's 'weights weights.txt' directive picks it up (Stage 1 test-only runs)
+wfile = [a[1:] for a in sys.argv[5:] if a.startswith("%")]
 # '@FROM:TO:SYN:FIELD=VALUE' rewrites one field of a network.cfg connection row,
 # FIELD in {radius, prob, strength, mini_s, mini_f}; e.g. @CX:CX:AMPA_D3:mini_s=0.0002
 cfg_over = [a[1:] for a in sys.argv[5:] if a.startswith("@")]
@@ -46,6 +49,12 @@ if cfg_over:
         print("CFG", key, old_v, "->", val, flush=True)
     open(os.path.join(M, "network.cfg"), "w").write("\n".join(cfg) + "\n")
 meta["cfg_overrides"] = cfg_over
+if wfile:
+    import shutil
+    assert len(wfile) == 1, wfile
+    shutil.copy(wfile[0], os.path.join(M, "protocols", "weights.txt"))
+    meta["weights_file"] = os.path.basename(wfile[0])
+    meta["weights_sha256"] = hashlib.sha256(open(wfile[0], "rb").read()).hexdigest()
 subprocess.run("g++ -O2 generate_network.cpp -o generate_network 2>/dev/null && "
                "./generate_network > connection_info2 2>gen.log", shell=True, cwd=M, check=True)
 meta["binary_sha256"] = hashlib.sha256(open(os.path.join(M, "mindcurrent"), "rb").read()).hexdigest()
@@ -59,6 +68,8 @@ args += extra
 meta["args"] = args
 tag = " ".join(extra + cfg_over)
 run_id = f"{proto}_s{seed}" + ("_" + hashlib.sha1(tag.encode()).hexdigest()[:6] if tag else "")
+if wfile:   # Stage 1: name the run by its weight set (which already carries the seed)
+    run_id = f"{proto}_" + os.path.splitext(os.path.basename(wfile[0]))[0] + ("_" + hashlib.sha1(tag.encode()).hexdigest()[:6] if tag else "")
 raw = os.path.abspath("raw"); os.makedirs(raw, exist_ok=True)
 if os.environ.get("WEI_PERSIST_DIR"):
     _d = os.path.join(os.environ["WEI_PERSIST_DIR"], run_id); os.makedirs(_d, exist_ok=True)

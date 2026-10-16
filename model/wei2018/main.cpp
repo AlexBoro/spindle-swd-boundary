@@ -366,6 +366,30 @@ void init_plastic_weights(){
       }
 }
 
+// Overwrite PY-PY AMPA_D3 weights and minis from a 'pre post g mini' text file
+// (protocol directive 'weights').  Iterates synapses in the recorder's order and
+// checks every pre/post pair, so a file from a different network aborts the run.
+// Bounds (weight_max/min, minis0) stay tied to 'strength', as in the trained run.
+void load_plastic_weights(const std::string &path){
+  FILE *f=fopen(path.c_str(),"r");
+  if(!f){ fprintf(stderr,"cannot open weights file %s\n",path.c_str()); exit(2); }
+  int n=0;
+  for(int i=0; i<num_cells; i++)
+    if(cells[i]->type==E_CX)
+      for(int k=0; k<cells[i]->num_syns; k++)
+        if(cells[i]->syns[k]->type==E_AMPA_D3){
+          AMPA_D3 *s=(AMPA_D3*)cells[i]->syns[k];
+          int pre,post; double g,mn;
+          if(fscanf(f,"%d %d %lf %lf",&pre,&post,&g,&mn)!=4){ fprintf(stderr,"weights file short at row %d\n",n); exit(2); }
+          if(pre!=cells[s->from_cell]->m || post!=cells[i]->m){
+            fprintf(stderr,"weights file row %d is %d->%d, network has %d->%d\n",n,pre,post,cells[s->from_cell]->m,cells[i]->m); exit(2); }
+          s->g_AMPA0=g; s->mini_s=mn; n++;
+        }
+  int extra; if(fscanf(f,"%d",&extra)==1){ fprintf(stderr,"weights file has more rows than synapses (%d)\n",n); exit(2); }
+  fclose(f);
+  printf("loaded %d PY-PY weights from %s\n",n,path.c_str());
+}
+
 static FILE *f_lfp=NULL, *f_w=NULL, *f_mini=NULL;
 void recorder_step(int ii, double t);
 static std::vector<AMPA_D3*> rec_syn;
@@ -432,6 +456,7 @@ int main(int argc,char **argv){
 
   scale_synapses(cells, num_cells);
   init_plastic_weights();
+  if(!protocol.weights_path.empty()) load_plastic_weights(protocol.weights_path);
 
   LFP.init();
   open_files(output_location,LFP.field_file,LFP.num_field_layers);
