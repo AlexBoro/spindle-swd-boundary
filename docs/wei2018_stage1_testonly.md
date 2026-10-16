@@ -36,10 +36,10 @@ Paired contrasts, all amplitudes pooled (`stage1_contrasts.csv`):
 | contrast | SM ≥ 0.8 | exact ABCDE | paper (approx.) |
 |---|---|---|---|
 | train − init | +13.7 (seed-t p .005) | +4.2 (p <.001) | +8.8 |
-| awake − train | +1.5 (p .63) | 0.0 (p 1.0) | ~+4, n.s. |
-| N2 − awake | +2.8 (p .04; McNemar .29) | +1.5 (p .31) | ~+8 |
-| N2+N3 − awake | +13.3 (p .017) | +12.2 (p .042) | ~+26 |
-| N3 − awake | +23.5 (p .008) | +23.5 (p .026) | ~+38 |
+| awake − train | +1.5 (p .63) | 0.0 (p 1.0) | ~+1, n.s. |
+| N2 − awake | +2.8 (p .04; McNemar .29) | +1.5 (p .31) | ~+6 |
+| N2+N3 − awake | +13.3 (p .017) | +12.2 (p .042) | ~+25 |
+| N3 − awake | +23.5 (p .008) | +23.5 (p .026) | ~+40 |
 
 - **The awake artefact disappears.** The awake-block weights recall no better than the end-of-training weights: +1.5 points, and 0.0 under exact ABCDE. The +8-point awake gain in the original Fig 3 runs therefore came from the state of the network in the post-block session, not from the weights.
 - **The paper's full ordering now reproduces:** N3 > N2+N3 > N2 ≥ awake ≈ train > init. N3 and N2+N3 are significant. N2 is only marginal.
@@ -70,7 +70,7 @@ N2+N3 gains the most from removing session history. The awake level at 1.2 alone
 1. **Readout, part 1: session-state history.** This fully explains the awake artefact, and part of why N2+N3 was not above awake in Fig 3.
 2. **Readout, part 2: inter-trial fatigue at 1 s.** It compresses all recall levels by about 20 points. This is a model-level deviation from the paper, not an analysis artefact.
 3. **Consolidation magnitude.** Recall is now almost a monotone function of the forward weight change, so whatever gap to the paper remains is set by Δw.
-   Our sleep weight gains over awake are N3 +29.5, N2+N3 +18.3 and N2 +4.2 points. The paper's are about +38, +26 and +8.
+   Our sleep weight gains over awake are N3 +29.5, N2+N3 +18.3 and N2 +4.2 points. The paper's weight gains over awake are about +38, +26 and +8 (weights ~65/53/35 vs 27 %).
    The N2 deficit is proportionally the largest, at about half of the paper's. Interpretation I2 (STDP halved in N2) and the spindle-frequency offset (6.5 vs ~7 Hz) remain the candidates.
 
 ## Suggested Stage 2
