@@ -1,0 +1,265 @@
+{
+ "jobs": {
+  "0": {
+   "job_id": "2c6062df-22a3-4275-aea7-f6a75f7b9f13",
+   "runs": [
+    [
+     "stage1_curve",
+     "awake_s0_block"
+    ],
+    [
+     "stage1_curve",
+     "n2n3_s2_block"
+    ],
+    [
+     "stage1_curve",
+     "train_s0"
+    ],
+    [
+     "stage1_spaced",
+     "awake_s0_block"
+    ],
+    [
+     "stage1_spaced",
+     "n2_s3_block"
+    ]
+   ]
+  },
+  "1": {
+   "job_id": "c697f57a-34c9-4f22-9396-5304258718cf",
+   "runs": [
+    [
+     "stage1_curve",
+     "n2_s0_block"
+    ],
+    [
+     "stage1_curve",
+     "n3_s2_block"
+    ],
+    [
+     "stage1_curve",
+     "train_s1"
+    ],
+    [
+     "stage1_spaced",
+     "n2_s0_block"
+    ],
+    [
+     "stage1_spaced",
+     "n3_s3_block"
+    ]
+   ]
+  },
+  "2": {
+   "job_id": "603ceaa1-0500-4a73-99a9-cba5099101e9",
+   "runs": [
+    [
+     "stage1_curve",
+     "n2n3_s0_block"
+    ],
+    [
+     "stage1_curve",
+     "awake_s3_block"
+    ],
+    [
+     "stage1_curve",
+     "train_s2"
+    ],
+    [
+     "stage1_spaced",
+     "n3_s0_block"
+    ],
+    [
+     "stage1_spaced",
+     "awake_s4_block"
+    ]
+   ]
+  },
+  "3": {
+   "job_id": "acb1f099-caab-4ab7-b9ca-40aecd16adc9",
+   "runs": [
+    [
+     "stage1_curve",
+     "n3_s0_block"
+    ],
+    [
+     "stage1_curve",
+     "n2_s3_block"
+    ],
+    [
+     "stage1_curve",
+     "train_s3"
+    ],
+    [
+     "stage1_spaced",
+     "awake_s1_block"
+    ],
+    [
+     "stage1_spaced",
+     "n2_s4_block"
+    ]
+   ]
+  },
+  "4": {
+   "job_id": "dade8482-16b3-4fb7-8236-f16b80fb196b",
+   "runs": [
+    [
+     "stage1_curve",
+     "awake_s1_block"
+    ],
+    [
+     "stage1_curve",
+     "n2n3_s3_block"
+    ],
+    [
+     "stage1_curve",
+     "train_s4"
+    ],
+    [
+     "stage1_spaced",
+     "n2_s1_block"
+    ],
+    [
+     "stage1_spaced",
+     "n3_s4_block"
+    ]
+   ]
+  },
+  "5": {
+   "job_id": "b0d40b68-4be7-4afb-ad55-c5e928dbe8d7",
+   "runs": [
+    [
+     "stage1_curve",
+     "n2_s1_block"
+    ],
+    [
+     "stage1_curve",
+     "n3_s3_block"
+    ],
+    [
+     "stage1_curve",
+     "init_s0"
+    ],
+    [
+     "stage1_spaced",
+     "n3_s1_block"
+    ],
+    [
+     "stage1_spaced",
+     "train_s0"
+    ]
+   ]
+  },
+  "6": {
+   "job_id": "ffc1fe37-7e0e-4cf6-b9cf-ce92d01009ce",
+   "runs": [
+    [
+     "stage1_curve",
+     "n2n3_s1_block"
+    ],
+    [
+     "stage1_curve",
+     "awake_s4_block"
+    ],
+    [
+     "stage1_curve",
+     "init_s1"
+    ],
+    [
+     "stage1_spaced",
+     "awake_s2_block"
+    ],
+    [
+     "stage1_spaced",
+     "train_s1"
+    ]
+   ]
+  },
+  "7": {
+   "job_id": "32721146-600e-4270-9b7e-ed1b394e116b",
+   "runs": [
+    [
+     "stage1_curve",
+     "n3_s1_block"
+    ],
+    [
+     "stage1_curve",
+     "n2_s4_block"
+    ],
+    [
+     "stage1_curve",
+     "init_s2"
+    ],
+    [
+     "stage1_spaced",
+     "n2_s2_block"
+    ],
+    [
+     "stage1_spaced",
+     "train_s2"
+    ]
+   ]
+  },
+  "8": {
+   "job_id": "406b0219-401d-4dbc-9a9f-44c8b6496c1a",
+   "runs": [
+    [
+     "stage1_curve",
+     "awake_s2_block"
+    ],
+    [
+     "stage1_curve",
+     "n2n3_s4_block"
+    ],
+    [
+     "stage1_curve",
+     "init_s3"
+    ],
+    [
+     "stage1_spaced",
+     "n3_s2_block"
+    ],
+    [
+     "stage1_spaced",
+     "train_s3"
+    ]
+   ]
+  },
+  "9": {
+   "job_id": "388bb217-7e8e-4939-9f75-e30e8ad5c0cb",
+   "runs": [
+    [
+     "stage1_curve",
+     "n2_s2_block"
+    ],
+    [
+     "stage1_curve",
+     "n3_s4_block"
+    ],
+    [
+     "stage1_curve",
+     "init_s4"
+    ],
+    [
+     "stage1_spaced",
+     "awake_s3_block"
+    ],
+    [
+     "stage1_spaced",
+     "train_s4"
+    ]
+   ]
+  }
+ },
+ "pp": {
+  "image": "im-pDQHgNfUuPPhKXneXN7S6z",
+  "cpu": 4,
+  "memory": 1024,
+  "timeout": 52000,
+  "volumes": {
+   "/vol": "wei2018-runs"
+  }
+ },
+ "git_sha": "9df9f02",
+ "note": "Stage 1: 5 runs per job, outputs persisted to Volume wei2018-runs:/stage1/<run_id>/"
+}

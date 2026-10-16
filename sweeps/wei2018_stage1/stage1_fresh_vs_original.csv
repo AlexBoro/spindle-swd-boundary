@@ -1,0 +1,9 @@
+,original session (1.2),original session (1.2),"fresh, 1.2 only","fresh, 1.2 only","fresh, all amps","fresh, all amps"
+,succ,exact,succ,exact,succ,exact
+wset,,,,,,
+init,15.2,,11.3,2.0,11.8,2.0
+train,18.4,,16.7,3.3,25.5,6.2
+awake,26.4,,24.0,3.3,27.0,6.2
+n2,23.2,,24.7,5.3,29.8,7.7
+n2n3,26.0,,32.0,10.0,40.3,18.3
+n3,40.0,,44.0,26.0,50.5,29.7

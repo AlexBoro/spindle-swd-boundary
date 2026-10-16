@@ -1,0 +1,11 @@
+contrast,metric,diff,p_seed_t,p_trial_mcnemar
+awake-train,succ,6.0,0.195,0.362
+awake-train,exact,-0.7,0.887,1.0
+n2-awake,succ,4.7,0.494,0.4887
+n2-awake,exact,4.0,0.324,0.405
+n3-awake,succ,30.7,0.004,0.0
+n3-awake,exact,36.7,0.011,0.0
+n2-train,succ,10.7,0.208,0.0764
+n2-train,exact,3.3,0.298,0.4731
+n3-train,succ,36.7,0.011,0.0
+n3-train,exact,36.0,0.03,0.0
