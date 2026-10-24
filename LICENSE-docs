@@ -1,0 +1,18 @@
+Documentation, figures and tables in this repository -- the contents of docs/
+and sweeps/ (write-ups, .md files, .png figures, .csv/.json result tables) --
+are licensed under the Creative Commons Attribution 4.0 International licence
+(CC BY 4.0), except where a file states otherwise.
+
+Copyright (c) 2026 AlexBoro
+
+You are free to share and adapt this material for any purpose, including
+commercially, provided you give appropriate credit, provide a link to the
+licence, and indicate if changes were made.
+
+Full licence text: https://creativecommons.org/licenses/by/4.0/legalcode
+Summary:           https://creativecommons.org/licenses/by/4.0/
+
+Not covered by this notice:
+  docs/sources/*.pdf -- supplementary material of the articles cited in
+  docs/sources/README.md, redistributed under those articles' open-access
+  licence; the copyright remains with the original authors/publisher.

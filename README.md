@@ -40,9 +40,29 @@ H1c is the substantive claim. See `docs/` for the full design.
 Phase 0 (infrastructure and reproduction). Gate 0 is not yet passed: the baseline
 has not been reproduced against `docs/acceptance_criteria.md`.
 
+## Licensing
+
+| Part of the repository | Licence |
+|---|---|
+| Code not marked otherwise (`analysis/`, `sim/`, `tools/`, …) | MIT — see `LICENSE` |
+| `model/wei2018/` (modified copy of the Gonzalez et al. 2020 C++ model) | GPL-2.0 — see `model/wei2018/LICENSE`, `model/wei2018/PROVENANCE.md` |
+| `model/thalamocortical2/` (Dervinis & Crunelli NEURON model) | GPL-3.0 — see `model/thalamocortical2/LICENSE` |
+| Unmodified copies of Dervinis & Crunelli MATLAB helpers in `analysis/matlab_reference/` and `tools/matlab_bridge/lib/` (`ciplot.m`, `detectEEGspikesSWDs.m`, `oscFreq.m`, `spectra.m`) | GPL-3.0 |
+| Documentation, figures and tables (`docs/`, `sweeps/`) | CC BY 4.0 — see `LICENSE-docs` |
+| `docs/sources/*.pdf` (journal supplementary material) | The source articles' open-access licence — see `docs/sources/README.md` |
+
+The two model directories are separate programs; the MIT-licensed code drives
+them as external processes and does not link against them.
+
 ## Attribution
 
-The vendored model is the work of Martynas Dervinis and Vincenzo Crunelli, from
+The `model/wei2018/` simulator is derived from `bazhlab-ucsd/TCmodel-sequenceLearningSleepCode-eLife2020`
+(Gonzalez OC, Sokolov Y, Krishnan GP, Delanois JE, Bazhenov M. *eLife* 2020;9:e51005), adapted to
+reproduce Wei Y, Krishnan GP, Komarov M, Bazhenov M. *Differential roles of sleep spindles and sleep slow
+oscillations in memory consolidation.* PLoS Comput Biol 2018;14:e1006322. Changes are listed in
+`model/wei2018/PROVENANCE.md`.
+
+The vendored NEURON model is the work of Martynas Dervinis and Vincenzo Crunelli, from
 `github.com/dervinism/thalamocortical2` (Zenodo `10.5281/zenodo.7724443`), under
 its own licence — see `model/thalamocortical2/LICENSE`. Papers:
 

@@ -40,3 +40,7 @@ reference is traceable.
 
 `detectEEGspikesSWDs.m`, `oscFreq.m` and `ciplot.m` are copied unmodified from
 `model/thalamocortical2/` so the harness is self-contained. Do not edit them.
+
+## Licence of copied files
+
+The MATLAB helpers copied unmodified from `model/thalamocortical2` (Dervinis & Crunelli) in this folder are GPL-3.0, as in the original deposit (see `model/thalamocortical2/LICENSE`). Everything else here is MIT (repository `LICENSE`).

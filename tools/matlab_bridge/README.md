@@ -73,3 +73,7 @@ far side.
   has its own `timeout`, but that only stops *waiting* — it does not stop the job.
 - **Figures are suppressed only if the job suppresses them.** Nothing here forces
   `-nodisplay`.
+
+## Licence of copied files
+
+The MATLAB helpers copied unmodified from `model/thalamocortical2` (Dervinis & Crunelli) in this folder are GPL-3.0, as in the original deposit (see `model/thalamocortical2/LICENSE`). Everything else here is MIT (repository `LICENSE`).
