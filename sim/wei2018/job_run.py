@@ -97,6 +97,9 @@ d["spk_type"] = sp[:, 1].astype(np.int8)
 d["spk_m"] = sp[:, 2].astype(np.int16)
 lfp = np.fromfile(os.path.join(raw, "lfp.f32"), dtype=np.float32)
 d["lfp"] = lfp[: len(lfp) // 5 * 5].reshape(-1, 5)
+ra = os.path.join(raw, "rec_area.f32")
+if os.path.exists(ra):   # -rec_area 1: t + 2 regions x 7 trained-area state columns (see main.cpp area_step)
+    a = np.fromfile(ra, dtype=np.float32); d["rec_area"] = a[: len(a) // 15 * 15].reshape(-1, 15)
 idx = np.loadtxt(os.path.join(raw, "weights_index.txt"), dtype=np.int32, ndmin=2)
 d["w_pre"], d["w_post"] = idx[:, 0], idx[:, 1]
 n = len(idx) + 1
