@@ -1,6 +1,6 @@
 # Wei et al. 2018 reproduction: Fig 2/3 (single sequence, four sleep conditions)
 
-Model: `model/wei2018/` at 4341ed9 (job driver c6b2150); see `PROVENANCE.md`,
+Model: `model/wei2018/` at 62b47c8 (job driver 3a37f9f); see `PROVENANCE.md`,
 `docs/wei2018_interpretations.md` and `docs/wei2018_gate.md`.
 Runs: 20 (conditions N2+N3, awake, N2 only, N3 only x seeds 0-4), 562 s each
 (12 s warm-up + paper t = 0-550 s), Modal cpu=4 / 1 GB, median 9.6 h wall per run.

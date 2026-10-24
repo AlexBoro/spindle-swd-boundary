@@ -1,6 +1,6 @@
 # Wei et al. 2018 reimplementation: Stage 0 diagnostics (analysis only)
 
-This stage used the 20 existing Fig 3 runs: 4 conditions × seeds 0–4, 562 s each, at commit acb0e5b. No new simulations were run.
+This stage used the 20 existing Fig 3 runs: 4 conditions × seeds 0–4, 562 s each, at commit f48134b. No new simulations were run.
 The question is which parts of the Fig 3 mismatch come from the readout, which from the model's state, and which from the consolidation magnitude.
 Figure: `sweeps/wei2018_stage0/wei2018_stage0_diagnostics.png`. Tables are in the same folder.
 

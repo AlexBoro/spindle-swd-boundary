@@ -260,6 +260,6 @@
    "/vol": "wei2018-runs"
   }
  },
- "git_sha": "9df9f02",
+ "git_sha": "fdcef38",
  "note": "Stage 1: 5 runs per job, outputs persisted to Volume wei2018-runs:/stage1/<run_id>/"
 }

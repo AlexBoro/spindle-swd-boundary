@@ -20,7 +20,11 @@ import os
 import time
 import uuid
 
-DEFAULT_ROOT = "~/dev/matlab_bridge"
+# Bridge folder: $MATLAB_BRIDGE_ROOT, else a matlab_bridge/ folder next to this repo,
+# else ~/dev/matlab_bridge.
+_REPO_PARENT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_SIBLING = os.path.join(_REPO_PARENT, "matlab_bridge")
+DEFAULT_ROOT = _SIBLING if os.path.isdir(_SIBLING) else os.path.expanduser("~/dev/matlab_bridge")
 HEARTBEAT_MAX_AGE_S = 30
 
 

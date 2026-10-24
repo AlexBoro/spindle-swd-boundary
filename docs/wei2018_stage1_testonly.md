@@ -4,7 +4,7 @@
 Stage 0 left one question open. Are the small sleep effects on recall in N2 and N2+N3 a readout problem, or does consolidation actually fall short?
 Stage 1 separates the two. The network is restarted fresh, the saved PY-PY weights are loaded, and recall is tested with plasticity off. Every weight set is therefore tested from the same state, with no session history.
 
-## Method (commit 9df9f02)
+## Method (commit fdcef38)
 - **Weights directive.** A new protocol directive, `weights <file>`, overwrites every PY-PY AMPA_D3 weight and mini amplitude after the initial weights are set.
   - The jitter draws are still consumed first, so every RNG stream is unchanged.
   - Each pre/post pair is checked against the network.
