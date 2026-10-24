@@ -734,6 +734,8 @@ public:
  void iii(unsigned int seek) {
  }
  double calc(double x, double y_pre, int y_post);
+ // available release efficacy for a spike at time t (depression state recovered to t)
+ double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
 };
 
 
@@ -790,6 +792,8 @@ class AMPA_D3:public Syn {
   void iii(unsigned int seek) {
   }
   double calc(double time, double y_post, int y_pre);
+ // available release efficacy for a spike at time t (depression state recovered to t)
+ double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
   double calc_ampad3(double time, double v_post, int y_pre,int y_post);
 };
 
@@ -867,6 +871,8 @@ public:
  void iii(unsigned int seek) {
  }
  double calc(double x, double y_pre, int y_post);
+ // available release efficacy for a spike at time t (depression state recovered to t)
+ double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
 }; 
 
 

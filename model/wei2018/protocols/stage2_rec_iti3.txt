@@ -1,0 +1,20 @@
+# Stage 2 D5: trained-area state recording, test-only from loaded weights, ITI 3 s, amp 1.2, tmax = 57000 ms
+# run with -rec_area 1 -plasticity_start 999999999
+state 0 57000 awake
+seq 1 5 200 205 210 215 220
+weights weights.txt
+test 1 12000 13000 0 1.20
+test 1 15000 16000 0 1.20
+test 1 18000 19000 0 1.20
+test 1 21000 22000 0 1.20
+test 1 24000 25000 0 1.20
+test 1 27000 28000 0 1.20
+test 1 30000 31000 0 1.20
+test 1 33000 34000 0 1.20
+test 1 36000 37000 0 1.20
+test 1 39000 40000 0 1.20
+test 1 42000 43000 0 1.20
+test 1 45000 46000 0 1.20
+test 1 48000 49000 0 1.20
+test 1 51000 52000 0 1.20
+test 1 54000 55000 0 1.20

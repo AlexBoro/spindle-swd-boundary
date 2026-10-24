@@ -4,6 +4,7 @@
 
 #include "currents.h"
 #include "bmalgo.h"
+#include "protocol.h"
 using namespace std;
 
 
@@ -492,7 +493,9 @@ double AMPA_D2::calc(double x, double y_pre, int y_post){
 	  R = R1 * exptable (-Beta * (x - (lastrelease + Cdur)));
 	}
 
-  I = g1 * fac_AMPA_D2 * R * (y_pre - E_AMPA);
+  // tc_ampa_route = 1: TC->PY and TC->IN take the 'AMPA from TC' factor (literal reading of
+  // Wei 2018 Methods); 0 = code lineage (all AMPA_D2 scaled by the 'from PY' factor).
+  I = g1 * ((tc_ampa_route && from_type == E_TC) ? fac_AMPA_TC : fac_AMPA_D2) * R * (y_pre - E_AMPA);
 
   return I;
 }

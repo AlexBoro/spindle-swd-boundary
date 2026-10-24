@@ -58,7 +58,7 @@ void load_input_params(
   add_double_param(stdp_cP); add_double_param(stdp_cD); add_double_param(stdp_cD_train);
   add_double_param(stdp_factor_n2); add_double_param(stdp_factor_n3);
   add_double_param(plasticity_start); add_double_param(weight_dt); add_double_param(lfp_dt);
-  add_int_param(weight_jitter);
+  add_int_param(weight_jitter); add_int_param(tc_ampa_route); add_int_param(rec_area);
   add_double_param(gkl_cx_awake); add_double_param(gkl_cx_n2); add_double_param(gkl_cx_n3);
   add_double_param(gkl_tc_awake); add_double_param(gkl_tc_n2); add_double_param(gkl_tc_n3);
   add_double_param(gkl_re_awake); add_double_param(gkl_re_n2); add_double_param(gkl_re_n3);

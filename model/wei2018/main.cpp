@@ -435,7 +435,57 @@ void recorder_step(int ii, double t){
   }
 }
 
-void recorder_close(){ if(f_lfp)fclose(f_lfp); if(f_w)fclose(f_w); if(f_mini)fclose(f_mini); }
+
+// ---- optional trained-area recorder (rec_area 1): one row per LFP sample (1 ms) ----
+// cols: t, then for region R in {trained PY 200-224, control PY 400-424}: mean available efficacy of
+// AMPA_D3 PY->PY synapses with pre and post in R, of GABA_A_D2 IN->PY onto R, of AMPA_D2 PY->IN from R;
+// mean dendritic V, Ca_i, KCa gate, Km gate of the PY cells in R.  (15 floats per row)
+static FILE *f_area = NULL;
+static std::vector<int> area_py[2];
+static std::vector<AMPA_D3*> area_d3[2];
+static std::vector<GABA_A_D2*> area_gaba[2];
+static std::vector<AMPA_D2*> area_pyin[2];
+void area_open(){
+  if(!rec_area) return;
+  int lo[2] = {200, 400};
+  for(int r = 0; r < 2; r++)
+    for(int i = 0; i < num_cells; i++){
+      int m = cells[i]->m;
+      if(cells[i]->type == E_CX && m >= lo[r] && m < lo[r] + 25){
+        area_py[r].push_back(i);
+        for(int k = 0; k < cells[i]->num_syns; k++){
+          Syn *s = cells[i]->syns[k]; int pm = cells[s->from_cell]->m;
+          if(s->type == E_AMPA_D3 && pm >= lo[r] && pm < lo[r] + 25) area_d3[r].push_back((AMPA_D3*)s);
+          if(s->type == E_GABA_A_D2) area_gaba[r].push_back((GABA_A_D2*)s);
+        }
+      }
+      if(cells[i]->type == E_IN)
+        for(int k = 0; k < cells[i]->num_syns; k++){
+          Syn *s = cells[i]->syns[k]; int pm = cells[s->from_cell]->m;
+          if(s->type == E_AMPA_D2 && s->from_type == E_CX && pm >= lo[r] && pm < lo[r] + 25) area_pyin[r].push_back((AMPA_D2*)s);
+        }
+    }
+  printf("rec_area: PY %zu/%zu  D3 %zu/%zu  GABA %zu/%zu  PY->IN %zu/%zu\n", area_py[0].size(), area_py[1].size(),
+         area_d3[0].size(), area_d3[1].size(), area_gaba[0].size(), area_gaba[1].size(), area_pyin[0].size(), area_pyin[1].size());
+  f_area = fopen((output_location + "rec_area.f32").c_str(), "wb");
+}
+void area_step(int ii, double t){
+  if(!f_area || lfp_every <= 0 || ii % lfp_every) return;
+  float row[15]; row[0] = (float)(t + TAU); int c = 1;
+  for(int r = 0; r < 2; r++){
+    double a = 0, g = 0, pi = 0, v = 0, ca = 0, kca = 0, km = 0;
+    for(size_t k = 0; k < area_d3[r].size(); k++) a += area_d3[r][k]->efficacy(t);
+    for(size_t k = 0; k < area_gaba[r].size(); k++) g += area_gaba[r][k]->efficacy(t);
+    for(size_t k = 0; k < area_pyin[r].size(); k++) pi += area_pyin[r][k]->efficacy(t);
+    for(size_t k = 0; k < area_py[r].size(); k++){ double *y = cells[area_py[r][k]]->y; v += y[0]; ca += y[1]; kca += y[4]; km += y[5]; }
+    double n = area_py[r].size();
+    row[c++] = a / area_d3[r].size(); row[c++] = g / area_gaba[r].size(); row[c++] = pi / area_pyin[r].size();
+    row[c++] = v / n; row[c++] = ca / n; row[c++] = kca / n; row[c++] = km / n;
+  }
+  fwrite(row, sizeof(float), 15, f_area);
+}
+
+void recorder_close(){ if(f_area)fclose(f_area); if(f_lfp)fclose(f_lfp); if(f_w)fclose(f_w); if(f_mini)fclose(f_mini); }
 
 //+++++++++++++++++++ MAIN PROGRAM +++++++++++++++++++++++++++++++++++++++++++
 int main(int argc,char **argv){
@@ -490,6 +540,7 @@ int main(int argc,char **argv){
   fmanipulations = fopen((output_location+"manipulation.txt").c_str(),"w");
   recorder_open();
   recorder_initial_snapshot();
+  area_open();
 
   print_connectivity(cell_sizes);
 
@@ -560,6 +611,7 @@ int main(int argc,char **argv){
     }
 
     recorder_step(ii, t);
+    area_step(ii, t);
     t = t + TAU; //increase time
   } //end while loop
 
