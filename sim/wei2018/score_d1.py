@@ -1,4 +1,4 @@
-"""Provisional Stage 2 D1 scoring (full N2 STDP, tag f1) against the Stage 1 / Fig 3 baselines.
+"""Stage 2 D1 scoring (full N2 STDP, tag f1) against the Stage 1 / Fig 3 baselines.
 Run from the directory holding hpc/ (fetched run files) and the spindle-swd-boundary checkout; writes d1/."""
 import glob, os, re, json, subprocess, sys
 import numpy as np, pandas as pd
