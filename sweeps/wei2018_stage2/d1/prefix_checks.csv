@@ -1,0 +1,9 @@
+run,prefix_spikes_identical,prefix_weights_identical,n_prefix_spikes,weights_file
+fig3_n2_s3_8c6045.npz,True,True,121689,stage1_weights/n2f1_s3_block.txt
+fig3_n2n3_s2_8c6045.npz,True,True,116145,stage1_weights/n2n3f1_s2_block.txt
+fig3_n2n3_s3_8c6045.npz,True,True,121689,stage1_weights/n2n3f1_s3_block.txt
+fig3_n2_s1_8c6045.npz,True,True,117220,stage1_weights/n2f1_s1_block.txt
+fig3_n2n3_s4_8c6045.npz,True,True,116701,stage1_weights/n2n3f1_s4_block.txt
+fig3_n2n3_s1_8c6045.npz,True,True,117220,stage1_weights/n2n3f1_s1_block.txt
+fig3_n2_s2_8c6045.npz,True,True,116145,stage1_weights/n2f1_s2_block.txt
+fig3_n2_s4_8c6045.npz,True,True,116701,stage1_weights/n2f1_s4_block.txt
