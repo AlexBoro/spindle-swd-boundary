@@ -761,6 +761,14 @@ public:
  double calc(double x, double y_pre, int y_post);
  // available release efficacy for a spike at time t (depression state recovered to t)
  double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
+ // exact no-op test (share_gates plan): with no presynaptic spike this call would change no state
+ // and return I = +-0 -- gate closed (C == 0, R == 0, R cannot grow back without a release) and no
+ // spontaneous release due.  Same expressions as calc().
+ bool idle(double x) const {
+   if(C != 0 || R != 0) return false;
+   double qq = ((x - lastrelease) - Cdur);
+   return !(qq > Deadtime && ((x - lastrelease1) > 50.0) && ((x - lastrelease) > newrelease));
+ }
 };
 
 
@@ -820,6 +828,15 @@ class AMPA_D3:public Syn {
  // available release efficacy for a spike at time t (depression state recovered to t)
  double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
   double calc_ampad3(double time, double v_post, int y_pre,int y_post);
+  // also needs no post spike (STDP); checked by the caller
+ // exact no-op test (share_gates plan): with no presynaptic spike this call would change no state
+ // and return I = +-0 -- gate closed (C == 0, R == 0, R cannot grow back without a release) and no
+ // spontaneous release due.  Same expressions as calc().
+ bool idle(double x) const {
+   if(C != 0 || R != 0) return false;
+   double qq = ((x - lastrelease) - Cdur);
+   return !(qq > Deadtime && ((x - lastrelease1) > 50.0) && ((x - lastrelease) > newrelease));
+ }
 };
 
 
@@ -904,6 +921,11 @@ public:
  double calc(double x, double y_pre, int y_post);
  // available release efficacy for a spike at time t (depression state recovered to t)
  double efficacy(double t){ return 1 - (1 - E*(1-Use)) * exptable(-((t - lastrelease1) - Cdur)/Tr); }
+ bool idle(double x) const {   // see AMPA_D2::idle
+   if(C != 0 || R != 0) return false;
+   double qq = ((x - lastrelease) - Cdur);
+   return !(qq > Deadtime && ((x - lastrelease1) > 50.0) && ((x - lastrelease) > newrelease));
+ }
 }; 
 
 

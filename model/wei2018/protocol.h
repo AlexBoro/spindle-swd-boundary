@@ -93,6 +93,7 @@ extern double gaba_cx_awake, gaba_cx_n2, gaba_cx_n3;
 extern double gaba_th_awake, gaba_th_n2, gaba_th_n3;
 extern double stdp_factor_n2, stdp_factor_n3;
 extern double plasticity_start;
+extern int idle_skip_off;
 extern int share_gates;          // 1 = gate state of AMPA/GABA_A/NMDA_D1 computed once per presynaptic cell (exact)   // ms; STDP frozen before (donor: 12000)
 extern double weight_dt;          // ms between PY-PY weight snapshots (0 = off)
 extern double lfp_dt;             // ms between LFP samples (0 = off)

@@ -95,7 +95,8 @@ class CellSyn{
   // compact per-cell synapse plan (share_gates): one entry per synapse, in syns[] order, so the
   // current is accumulated in exactly the original order.  Shared entries carry what their current
   // needs (strength, reversal, pointers to the leader's gate) and never touch the Syn object.
-  struct PlanE { long kind; Syn *s; const double *R; const double *E; double str; double erev; };
+  // kind: 1/2/3 shared AMPA/GABA_A/NMDA_D1; 0 other; -1/-2/-3 AMPA_D2/AMPA_D3/GABA_A_D2 (idle test first)
+  struct PlanE { long kind; Syn *s; const double *R; const double *E; double str; double erev; long from; };
   PlanE *plan; int n_plan;
   void build_plan();
 

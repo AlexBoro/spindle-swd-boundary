@@ -279,7 +279,13 @@ void CellSyn::calc(double x, double *y_ini, double *f_ini, int step){
     double fn = 0; int have_fn = 0;
     for(int p = 0; p < n_plan; p++){
       const PlanE &e = plan[p];
-      if(e.kind == 0){ calc_one_syn(e.s, x, vd, step, current, k); continue; }
+      if(e.kind <= 0){
+        if(e.kind < 0 && !(step > 0 && cells[e.from]->flip) && !(e.kind == -2 && this->flip)){
+          bool idle = e.kind == -1 ? ((AMPA_D2*)e.s)->idle(x) : e.kind == -2 ? ((AMPA_D3*)e.s)->idle(x) : ((GABA_A_D2*)e.s)->idle(x);
+          if(idle) continue;                      // exact no-op: no state change, I = +-0
+        }
+        calc_one_syn(e.s, x, vd, step, current, k); continue;
+      }
       double R = *e.R;
       if(R == 0) continue;                      // I = +-0 exactly
       if(e.kind == 1)      current = current - e.str * fac_AMPA_TC * R * (vd - e.erev);
@@ -414,10 +420,14 @@ void CellSyn::calc_one_syn(Syn *sy, double x, double vd, int step, double &curre
   }
 }
 
+extern int idle_skip_off;
 void CellSyn::build_plan(){
   plan = new PlanE[num_syns]; n_plan = num_syns;
   for(int i = 0; i < num_syns; i++){
-    Syn *s = syns[i]; PlanE e = {s->gkind, s, NULL, NULL, s->strength, 0};
+    Syn *s = syns[i]; PlanE e = {s->gkind, s, NULL, NULL, s->strength, 0, s->from_cell};
+    if(!s->gkind && !s->giant && !idle_skip_off){
+      if(s->type == E_AMPA_D2) e.kind = -1; else if(s->type == E_AMPA_D3) e.kind = -2; else if(s->type == E_GABA_A_D2) e.kind = -3;
+    }
     if(s->gkind){ e.R = shared_Rptr(s); e.E = shared_Eptr(s); e.erev = shared_erev(s); }
     plan[i] = e;
   }
