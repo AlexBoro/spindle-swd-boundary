@@ -331,6 +331,28 @@ double GABA_A::calc(double x, double y_pre, int y_post) {
   return I;
 }
 
+void GABA_A::gate(double x, int y_post) { 
+
+	q = ((x - lastrelease) - Cdur);         
+	if (q > Deadtime) {
+	  if (y_post) {        
+      C = Cmax;                
+      R0 = R;
+      lastrelease = x;
+	  }
+	}else if (q < 0) { 
+	}else if (C == Cmax) {                  
+	  R1 = R;
+	  C = 0.;
+	}
+	if (C > 0) {                            
+	  R = Rinf + (R0 - Rinf) * exptable (-(x - lastrelease) / Rtau);
+	}else{                              
+	  R = R1 * exptable (-Beta * (x - (lastrelease + Cdur)));
+	}
+}
+
+
 //------second order kinet model (including G-proteins) for GABA-B synapse----
 double GABA_B::E_GABA = -95, GABA_B::Cmax = 0.5, GABA_B::Deadtime = 1;
 double GABA_B::Prethresh = 0;
@@ -404,6 +426,38 @@ double AMPA::calc(double x, double y_pre, int y_post) {
   I = strength * fac_AMPA_TC * R * (y_pre - E_AMPA);
   return I;
 }
+
+void AMPA::gate(double x, int y_post) {
+
+  q = ((x - lastrelease) - Cdur); 
+  
+  if(q > Deadtime) {
+    if(y_post) {
+      if( (x - lastspike) > (Cdel + Cdur) ){
+        lastspike = x;
+        s = 1; 
+      } 
+    }  //the flag that spike was but wasn't utilized yet
+
+    if((s == 1) && ((x - lastspike) > Cdel)) {
+      s = 0; //spike was utilized
+      C = Cmax;                
+      R0 = R;
+      lastrelease = x;  
+    }
+  }else if (q < 0){     
+  }else if (C == Cmax){             
+    R1 = R;
+    C = 0.;
+  }
+
+  if (C > 0) {                            
+    R = Rinf + (R0 - Rinf) * exptable (-(x - lastrelease) / Rtau);
+  } else {                              
+    R = R1 * exptable (-Beta * (x - (lastrelease + Cdur)));
+  }
+}
+
 
 //------------first order kiner model for AMPA synapse WITH depression------
 double AMPA_D1::E_AMPA = 0, AMPA_D1::Cdur = 0.3, AMPA_D1::Cmax = 0.5;
@@ -675,6 +729,39 @@ double NMDA_D1::calc(double x, double y_pre, int y_post) {
   return I;
 }
 
+void NMDA_D1::gate(double x, int y_post) {
+
+	q = ((x - lastrelease) - Cdur); 
+
+	if(q > Deadtime) {
+	  if(y_post) {
+      if( (x - lastspike) > (Cdel + Cdur) ){
+        lastspike = x;
+        s = 1; //the flag that spike was but wasn't utilized
+      } 
+	  }  
+
+	  if((s == 1) && ((x - lastspike) > Cdel)) {
+      s = 0; //spike was utilized
+      C = Cmax;                
+      R0 = R;
+      E = 1 - (1 - E*(1-Use)) * exptable(-q/Tr);
+      lastrelease = x;  
+	  }
+	} else if (q < 0) {                     
+	} else if (C == Cmax) {                  
+	  R1 = R;
+	  C = 0.;
+	}
+
+	if (C > 0) {                            
+	  R = Rinf + (R0 - Rinf) * exptable (-(x - lastrelease) / Rtau);
+	} else {                              
+	  R = R1 * exptable (-Beta * (x - (lastrelease + Cdur)));
+	}
+}
+
+
 //---first order kiner model for GABA-A synapse with DEPRESSION & spont IPSPs--
 double GABA_A_D2::Cdur = 0.3, GABA_A_D2::Cmax = 0.5, GABA_A_D2::Deadtime = 1;
 double GABA_A_D2::Prethresh = 0, GABA_A_D2::Alpha = 0.53, GABA_A_D2::Beta =0.18; 
@@ -926,3 +1013,37 @@ void CX::calc(double x, double I, double *y, double *f){
   
 }
 //-------------------------------------------
+
+
+// ---- shared gates (share_gates = 1) ----
+// The gate (R, and E for NMDA_D1) of AMPA, GABA_A and NMDA_D1 synapses depends only on the
+// presynaptic spike train and the call times, so every synapse from one presynaptic cell holds a
+// bitwise-identical gate.  One leader per (presynaptic cell, kind) is updated by shared_gate();
+// every member computes its current from the leader's gate with the same expression as calc().
+double shared_R(Syn *s){
+  switch(s->gkind){
+    case 1: return ((AMPA*)s->lead)->R;
+    case 2: return ((GABA_A*)s->lead)->R;
+    case 3: return ((NMDA_D1*)s->lead)->R;
+  }
+  return 0;
+}
+double shared_I(Syn *s, double v){
+  switch(s->gkind){
+    case 1: { AMPA *a = (AMPA*)s, *L = (AMPA*)s->lead;
+              return a->strength * fac_AMPA_TC * L->R * (v - AMPA::E_AMPA); }
+    case 2: { GABA_A *a = (GABA_A*)s, *L = (GABA_A*)s->lead;
+              return a->strength * fac_GABA_TC * L->R * (v - a->E_GABA); }
+    case 3: { NMDA_D1 *a = (NMDA_D1*)s, *L = (NMDA_D1*)s->lead;
+              double fn = 1/(1+exp(-(v - (-25))/12.5));
+              return a->strength * L->R * fn * L->E * (v - NMDA_D1::E_NMDA); }
+  }
+  printf("shared_I: bad gkind\n"); exit(1);
+}
+void shared_gate(Syn *s, double x, int y_post){
+  switch(s->gkind){
+    case 1: ((AMPA*)s)->gate(x, y_post); return;
+    case 2: ((GABA_A*)s)->gate(x, y_post); return;
+    case 3: ((NMDA_D1*)s)->gate(x, y_post); return;
+  }
+}

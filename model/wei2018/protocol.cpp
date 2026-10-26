@@ -131,6 +131,7 @@ double gaba_cx_awake = 0.22,    gaba_cx_n2 = N_, gaba_cx_n3 = 0.22*2.0;
 double gaba_th_awake = 0.6,     gaba_th_n2 = N_, gaba_th_n3 = 0.6*2.0;
 double stdp_factor_n2 = N_, stdp_factor_n3 = 0.75;   // donor: factor 0.75 in sleep
 double plasticity_start = 12000;
+int share_gates = 1;
 double weight_dt = 1000;
 double lfp_dt = 1;
 int weight_jitter = 1;

@@ -275,6 +275,11 @@ void CellSyn::calc(double x, double *y_ini, double *f_ini, int step){
   // Run through all synapses
   for(i =0; i < num_syns; i++){
 
+	if(syns[i]->gkind){ // shared gate: current from the leader's gate; R == 0 gives I = +-0 exactly
+	  if(shared_R(syns[i]) != 0) current = current - shared_I(syns[i], vd);
+	  continue;
+	}
+
 	int syn_type=syns[i]->type;
 
 	int from=syns[i]->from_cell;

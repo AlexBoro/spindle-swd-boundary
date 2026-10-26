@@ -121,6 +121,9 @@ class CellSyn{
     my_rand = rand()/(RAND_MAX + 1.0);
     return my_rand;
   }
+  double get_cur_time(){ return cur_time; }
+  double get_tau(){ return tau; }
+  int get_current_step(){ return current_step; }
   int get_flip(){
     return this->flip;
   }
@@ -189,8 +192,8 @@ class REsyn:public CellSyn{
       if(syns[i]->type == E_GiantAMPAMap){
         ((GiantSynAMPA*) syns[i]->giant) -> alpha = 1;
       }
-      if(syns[i]->to_type == E_RE){
-        ((GABA_A*)syns[i])->E_GABA = -70;
+      if(syns[i]->to_type == E_RE && syns[i]->type == E_GABA_A){   // donor cast every synapse onto RE; for
+        ((GABA_A*)syns[i])->E_GABA = -70;                           // AMPA it hit the unused old_v field
       }
     } 
   }

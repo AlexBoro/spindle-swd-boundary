@@ -1,0 +1,10 @@
+# Development regression check B (6 s): as devcheck but N2 before N3: every code path of the Fig 3 design in short form.
+# tmax = 6000 ms. Run with -plasticity_start 0 so STDP is live from the start.
+state 0 3500 awake
+state 3500 4500 n2
+state 4500 5500 n3
+state 5500 6000 awake
+seq 1 5 200 205 210 215 220
+test 1 500 1500 0
+train 1 1500 3500 0
+test 1 5500 6000 0

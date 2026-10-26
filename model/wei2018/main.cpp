@@ -1,3 +1,6 @@
+#include <map>
+#include "fork.h"
+#include <vector>
 //Created by M.Bazhenov, 1997-2009
 //All rights reserved
 //Most recently edited by Peter Lonjers(just search the net if you need to find me)
@@ -81,8 +84,44 @@ double fac_GABA_TC;
 //all == whether both RK and MAP should be called at the same time
 //the order is important in order to ensure signaling and receiveing spikes between different steps
 
+// ---- shared gates (share_gates): one leader synapse per (presynaptic cell, kind) ----
+struct GateLead { Syn *s; int from; };
+static std::vector<GateLead> gate_leads;
+static void build_shared_gates(){
+  if(!share_gates) { printf("share_gates 0: every synapse computes its own gate\n"); return; }
+  std::map<std::pair<int,int>, Syn*> lead_of;
+  long n_members = 0;
+  for(int h = 0; h < hhi; h++){
+    CellSyn *c = cells[hhns[h]];
+    for(int k = 0; k < c->num_syns; k++){
+      Syn *s = c->syns[k];
+      if(s->giant) continue;
+      int kind = (s->type == E_AMPA) ? 1 : (s->type == E_GABA_A) ? 2 : (s->type == E_NMDA_D1) ? 3 : 0;
+      if(!kind) continue;
+      std::pair<int,int> key(s->from_cell, kind);
+      std::map<std::pair<int,int>, Syn*>::iterator it = lead_of.find(key);
+      if(it == lead_of.end()){ lead_of[key] = s; GateLead g = {s, s->from_cell}; gate_leads.push_back(g); s->lead = s; }
+      else s->lead = it->second;
+      s->gkind = kind; n_members++;
+    }
+  }
+  // every cell must step in lockstep (same cur_time and tau), so one time grid serves all leaders
+  for(int h = 1; h < hhi; h++)
+    if(cells[hhns[h]]->get_cur_time() != cells[hhns[0]]->get_cur_time() || cells[hhns[h]]->get_tau() != cells[hhns[0]]->get_tau()){
+      printf("share_gates: cells not in lockstep\n"); exit(1); }
+  printf("share_gates 1: %ld synapses read %zu shared gates\n", n_members, gate_leads.size());
+}
+
 void runMP(int all){
   int iter,i;
+  // gate times of the four RK substeps, with the same expressions as CellSyn::step()
+  double gt[4] = {0, 0, 0, 0};
+  int n_gl = (int)gate_leads.size();
+  if(n_gl){
+    double T0 = cells[hhns[0]]->get_cur_time(), tau0 = cells[hhns[0]]->get_tau();
+    if(cells[hhns[0]]->get_current_step() != 0){ printf("share_gates: substep out of phase\n"); exit(1); }
+    gt[0] = T0; gt[1] = T0 + tau0/2.0; gt[2] = gt[1]; gt[3] = T0 + tau0;
+  }
 #pragma omp parallel  private(i,iter)  num_threads(num_mp_threads)
   {
     // Run step for maps
@@ -94,6 +133,12 @@ void runMP(int all){
     }
 
     for(iter=0; iter<4; iter++){
+      // substep 2 repeats substep 1's time with no new spike input; a gate update is idempotent there
+      if(n_gl && iter != 2){
+#pragma omp for schedule(static)
+        for(int j=0; j<n_gl; j++)
+          shared_gate(gate_leads[j].s, gt[iter], iter == 0 ? cells[gate_leads[j].from]->flip : 0);
+      }
 #pragma omp for schedule(dynamic, block_size)
       for(i=0; i<hhi; i++){
         cells[hhns[i]]->step();
@@ -406,9 +451,9 @@ void recorder_open(){
           fprintf(fi,"%d %d\n", cells[cells[i]->syns[k]->from_cell]->m, cells[i]->m);
         }
   fclose(fi);
-  if(lfp_dt>0){ f_lfp=fopen((output_location+"lfp.f32").c_str(),"wb"); lfp_every=(int)(lfp_dt/TAU+0.5); }
-  if(weight_dt>0){ f_w=fopen((output_location+"weights_g.f32").c_str(),"wb");
-                   f_mini=fopen((output_location+"weights_mini.f32").c_str(),"wb"); w_every=(int)(weight_dt/TAU+0.5); }
+  if(lfp_dt>0){ f_lfp=out_fopen(output_location+"lfp.f32","wb"); lfp_every=(int)(lfp_dt/TAU+0.5); }
+  if(weight_dt>0){ f_w=out_fopen(output_location+"weights_g.f32","wb");
+                   f_mini=out_fopen(output_location+"weights_mini.f32","wb"); w_every=(int)(weight_dt/TAU+0.5); }
 }
 void recorder_initial_snapshot(){ recorder_step(-1, 0.0); }   // weights at t = 0
 
@@ -467,7 +512,7 @@ void area_open(){
     }
   printf("rec_area: PY %zu/%zu  D3 %zu/%zu  GABA %zu/%zu  PY->IN %zu/%zu\n", area_py[0].size(), area_py[1].size(),
          area_d3[0].size(), area_d3[1].size(), area_gaba[0].size(), area_gaba[1].size(), area_pyin[0].size(), area_pyin[1].size());
-  f_area = fopen((output_location + "rec_area.f32").c_str(), "wb");
+  f_area = out_fopen(output_location + "rec_area.f32", "wb");
 }
 void area_step(int ii, double t){
   if(!f_area || lfp_every <= 0 || ii % lfp_every) return;
@@ -530,6 +575,7 @@ int main(int argc,char **argv){
     }
   }
 
+  build_shared_gates();
   print_used_mem();
   time_t start_time = time(NULL);
   printf("root set up tau:%lf time:%lf tmax:%lf\n",TAU,t,tmax);
@@ -537,7 +583,7 @@ int main(int argc,char **argv){
   check_state_table();
   FILE *fproto = fopen((output_location+"protocol_used.txt").c_str(), "w");
   protocol.dump(fproto); fclose(fproto);
-  fmanipulations = fopen((output_location+"manipulation.txt").c_str(),"w");
+  fmanipulations = out_fopen(output_location+"manipulation.txt","w");
   recorder_open();
   recorder_initial_snapshot();
   area_open();
@@ -545,6 +591,8 @@ int main(int argc,char **argv){
   print_connectivity(cell_sizes);
 
   while( t < tmax){
+    fork_if_due(t, tmax);   // exact checkpoint/fork (fork.cpp); no-op unless -fork_at is set
+    if(!(t < tmax)) break;
     total_rec = 0;
 
     // vigilance state, STDP gate and training flag for this step (protocol.h)

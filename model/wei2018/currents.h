@@ -119,8 +119,13 @@ class Syn{
   enum Syn_Type type;
   double lastspike;
   GiantSyn *giant; //accumulator for spiking data, one per cell. NULL if not present for the particular synapse
+  // shared-gate optimisation (share_gates): synapses whose gate depends only on the presynaptic
+  // spike train read it from one leader synapse per (presynaptic cell, kind). gkind 0 = not shared.
+  Syn *lead;
+  long gkind;   // 8 bytes on purpose: keeps every derived class's member offsets 8-aligned as before
 
   Syn(Syn_Info *syn_info, GiantSyn *g=NULL){ 
+    this->lead = NULL; this->gkind = 0;
     this->strength = syn_info->strength;
     this->to_type = syn_info->to_type;
     this->from_type = syn_info->from_type;
@@ -508,6 +513,11 @@ class GAP:public Syn{
 
 };
 
+// ---- shared-gate helpers: same arithmetic, in the same order, as the I = ... line of each calc() ----
+double shared_I(Syn *s, double v);
+double shared_R(Syn *s);
+void shared_gate(Syn *s, double x, int y_post);
+
 //Giant class represents all synapses of a particular type for a given neuron.
 class GiantSyn{
  protected:
@@ -585,6 +595,9 @@ public:
  } 
 
  double calc(double x, double y_pre, int y_post);
+ void gate(double x, int y_post);   // gate part of calc() only (shared gates)
+ friend double shared_I(Syn *s, double v);
+ friend double shared_R(Syn *s);
 }; 
 
 
@@ -655,6 +668,9 @@ public:
    Rtau = 1 / ((Alpha * Cmax) + Beta);
  }
  double calc(double x, double y_pre, int y_post);
+ void gate(double x, int y_post);   // gate part of calc() only (shared gates)
+ friend double shared_I(Syn *s, double v);
+ friend double shared_R(Syn *s);
 };
 
 
@@ -829,6 +845,9 @@ public:
  void iii(unsigned int seek) {
  }
  double calc(double x, double y_pre, int y_post);
+ void gate(double x, int y_post);   // gate part of calc() only (shared gates)
+ friend double shared_I(Syn *s, double v);
+ friend double shared_R(Syn *s);
 };
 
 

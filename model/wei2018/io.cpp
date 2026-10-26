@@ -2,6 +2,7 @@
 #include <sstream>
 #include "params.h"
 #include "protocol.h"
+#include "fork.h"
 #include <string.h>
 
 double print_receive(int m , int n, enum Cell_Type type); 
@@ -58,7 +59,7 @@ void load_input_params(
   add_double_param(stdp_cP); add_double_param(stdp_cD); add_double_param(stdp_cD_train);
   add_double_param(stdp_factor_n2); add_double_param(stdp_factor_n3);
   add_double_param(plasticity_start); add_double_param(weight_dt); add_double_param(lfp_dt);
-  add_int_param(weight_jitter); add_int_param(tc_ampa_route); add_int_param(rec_area);
+  add_int_param(weight_jitter); add_int_param(tc_ampa_route); add_int_param(rec_area); add_int_param(share_gates); add_double_param(fork_at); add_int_param(fork_threads);
   add_double_param(gkl_cx_awake); add_double_param(gkl_cx_n2); add_double_param(gkl_cx_n3);
   add_double_param(gkl_tc_awake); add_double_param(gkl_tc_n2); add_double_param(gkl_tc_n3);
   add_double_param(gkl_re_awake); add_double_param(gkl_re_n2); add_double_param(gkl_re_n3);
@@ -279,43 +280,43 @@ void open_files(string output_location,FILE **field_file, int num_field_layers){
   for(i=0; i<num_field_layers; i++){
     stringstream ss;
     ss << i;
-    field_file[i] = fopen((output_location+"field_file_" + ss.str()  ).c_str(), "w");
+    field_file[i] = out_fopen(output_location+"field_file_" + ss.str()  , "w");
   }
   
-  f2 = fopen((output_location+"dat").c_str(), "w");
-  f6 = fopen((output_location+"graf_re").c_str(), "w");
-  if (!(f7=fopen((output_location+"time_re").c_str(), "w"))){
+  f2 = out_fopen(output_location+"dat", "w");
+  f6 = out_fopen(output_location+"graf_re", "w");
+  if (!(f7=out_fopen(output_location+"time_re", "w"))){
       printf("probably out put folder doesn't exist\n");
       exit(1); 
   }
-  //f7 = fopen((output_location+"time_re").c_str(), "w");
-  f8 = fopen((output_location+"graf_tc").c_str(), "w");
-  f9 = fopen((output_location+"time_tc").c_str(), "w");
-  f10 = fopen((output_location+"graf_cx").c_str(), "w");
-  f11 = fopen((output_location+"time_cx").c_str(), "w");
-  f12 = fopen((output_location+"graf_in").c_str(), "w");
-  f13 = fopen((output_location+"time_in").c_str(), "w");
-  f14 = fopen((output_location+"graf_cxa").c_str(), "w");
-  f15 = fopen((output_location+"time_cxa").c_str(), "w");
-  f16 = fopen((output_location+"graf_tca").c_str(), "w");
-  f17 = fopen((output_location+"time_tca").c_str(), "w");
-  f18 = fopen((output_location+"graf_ina").c_str(), "w"); // TB IN layers
-  f19 = fopen((output_location+"time_ina").c_str(), "w"); // TB IN layers 
-  f20 = fopen((output_location+"time_G_AMPA0_CX_CX").c_str(), "w");
-  f21 = fopen((output_location+"time_G_AMPA0_CXa_CX").c_str(), "w");
-  f22 = fopen((output_location+"time_G_AMPA0_CX_CXa").c_str(), "w"); // TB IN layers
-  f23 = fopen((output_location+"time_G_AMPA0_CXa_CXa").c_str(), "w"); // TB IN layers
+  //f7 = out_fopen(output_location+"time_re", "w");
+  f8 = out_fopen(output_location+"graf_tc", "w");
+  f9 = out_fopen(output_location+"time_tc", "w");
+  f10 = out_fopen(output_location+"graf_cx", "w");
+  f11 = out_fopen(output_location+"time_cx", "w");
+  f12 = out_fopen(output_location+"graf_in", "w");
+  f13 = out_fopen(output_location+"time_in", "w");
+  f14 = out_fopen(output_location+"graf_cxa", "w");
+  f15 = out_fopen(output_location+"time_cxa", "w");
+  f16 = out_fopen(output_location+"graf_tca", "w");
+  f17 = out_fopen(output_location+"time_tca", "w");
+  f18 = out_fopen(output_location+"graf_ina", "w"); // TB IN layers
+  f19 = out_fopen(output_location+"time_ina", "w"); // TB IN layers 
+  f20 = out_fopen(output_location+"time_G_AMPA0_CX_CX", "w");
+  f21 = out_fopen(output_location+"time_G_AMPA0_CXa_CX", "w");
+  f22 = out_fopen(output_location+"time_G_AMPA0_CX_CXa", "w"); // TB IN layers
+  f23 = out_fopen(output_location+"time_G_AMPA0_CXa_CXa", "w"); // TB IN layers
 
-  f24 = fopen((output_location+"graf_cx6").c_str(), "w"); // TB IN layers
-  f25 = fopen((output_location+"time_cx6").c_str(), "w"); // TB IN layers
-  f26 = fopen((output_location+"graf_in6").c_str(), "w"); // TB IN layers
-  f27 = fopen((output_location+"time_in6").c_str(), "w"); // TB IN layers
+  f24 = out_fopen(output_location+"graf_cx6", "w"); // TB IN layers
+  f25 = out_fopen(output_location+"time_cx6", "w"); // TB IN layers
+  f26 = out_fopen(output_location+"graf_in6", "w"); // TB IN layers
+  f27 = out_fopen(output_location+"time_in6", "w"); // TB IN layers
 
-  f28 = fopen((output_location+"cx_cx_g_ampa0").c_str(), "w");
+  f28 = out_fopen(output_location+"cx_cx_g_ampa0", "w");
 
-  f30 =fopen((output_location+"time_minis_AMPA_CX_CX").c_str(), "w"); 
-  f32 = fopen((output_location+"spike_time").c_str(),"w");
-  fconn = fopen((output_location+"conn_index_cx_cx_G").c_str(), "w"); // 
+  f30 =out_fopen(output_location+"time_minis_AMPA_CX_CX", "w"); 
+  f32 = out_fopen(output_location+"spike_time","w");
+  fconn = out_fopen(output_location+"conn_index_cx_cx_G", "w"); // 
 
   printf("files open for write\n");
 }
