@@ -90,7 +90,8 @@ print("RC", rc, "completed", meta["completed"], "wall_s", round(meta["wall_s"]),
 # ---- reduce ----
 d = {}
 sp = np.loadtxt(os.path.join(raw, "spike_time"), ndmin=2) if os.path.getsize(os.path.join(raw, "spike_time")) else np.zeros((0, 4))
-order = np.lexsort((sp[:, 2], sp[:, 0])) if len(sp) else np.arange(0)
+# full key (t, type, cell): spikes of one step are written in thread order
+order = np.lexsort((sp[:, 2], sp[:, 1], sp[:, 0])) if len(sp) else np.arange(0)
 sp = sp[order]
 d["spk_t"] = sp[:, 0].astype(np.float64)
 d["spk_type"] = sp[:, 1].astype(np.int8)

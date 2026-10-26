@@ -1,0 +1,9 @@
+# Development regression check W (3 s): test-only run from saved weights (Stage 1 path).
+# tmax = 3000 ms. Run with -plasticity_start 999999999 -rec_area 1.
+weights devcheck_weights.txt
+state 0 1000 awake
+state 1000 2000 n3
+state 2000 3000 n2
+seq 1 5 200 205 210 215 220
+test 1 200 1000 0
+test 1 2000 3000 0
