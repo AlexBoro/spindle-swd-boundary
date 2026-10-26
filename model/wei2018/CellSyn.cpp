@@ -1,7 +1,8 @@
 #include "CellSyn.h"
 
 
-CellSyn::CellSyn(int i,int j,int b_size,int t_size,Cell_Info *cell_info,int type){    
+CellSyn::CellSyn(int i,int j,int b_size,int t_size,Cell_Info *cell_info,int type){
+  plan = NULL; n_plan = 0;    
 
   rand_buffer = new drand48_data;
   srand48_r(2000,rand_buffer);
@@ -273,6 +274,22 @@ void CellSyn::calc(double x, double *y_ini, double *f_ini, int step){
     reset_GiantSyns();
 
   // Run through all synapses
+  if(plan){
+    // same accumulation order and arithmetic as below; NMDA's voltage factor depends only on vd
+    double fn = 0; int have_fn = 0;
+    for(int p = 0; p < n_plan; p++){
+      const PlanE &e = plan[p];
+      if(e.kind == 0){ calc_one_syn(e.s, x, vd, step, current, k); continue; }
+      double R = *e.R;
+      if(R == 0) continue;                      // I = +-0 exactly
+      if(e.kind == 1)      current = current - e.str * fac_AMPA_TC * R * (vd - e.erev);
+      else if(e.kind == 2) current = current - e.str * fac_GABA_TC * R * (vd - e.erev);
+      else {
+        if(!have_fn){ fn = 1/(1+exp(-(vd - (-25))/12.5)); have_fn = 1; }
+        current = current - e.str * R * fn * (*e.E) * (vd - e.erev);
+      }
+    }
+  } else
   for(i =0; i < num_syns; i++){
 
 	if(syns[i]->gkind){ // shared gate: current from the leader's gate; R == 0 gives I = +-0 exactly
@@ -366,3 +383,42 @@ double CellSyn::calc_GiantSyns(){
   return sum;
 }
 
+
+
+// one non-shared synapse: the body of the original loop in CellSyn::calc, unchanged
+void CellSyn::calc_one_syn(Syn *sy, double x, double vd, int step, double &current, int &k){
+  int input_soma = 0;
+  int syn_type = sy->type;
+  int from = sy->from_cell;
+  GiantSyn *gs = sy->giant;
+  if(syn_type == E_GAP){
+    double input_dend = cells[from]->base_cell->get_v_dend();
+    current = current - ((GAP*)sy)->calc_gap(x, vd, input_dend);
+    return;
+  }
+  if (step>0) {
+    if (this->ismap) input_soma = cells[from]->flip_for_maps;
+    else input_soma = cells[from]->flip;
+    if (gs && input_soma) gs->add_spike();
+  } else input_soma = 0;
+  if(gs){}
+  else{
+    if(syn_type == E_GABA_B){
+      current = current - ((GB*)sy)->calc_gb(x, y+num_b_eq+2*k, f+num_b_eq+2*k, vd, input_soma);
+      k = k + 1;
+    }
+    else if(syn_type==E_AMPA_D3)
+      current = current - ((AMPA_D3*)sy)->calc_ampad3(x,vd,input_soma,this->flip);
+    else
+      current = current - sy->calc(x, vd, input_soma);
+  }
+}
+
+void CellSyn::build_plan(){
+  plan = new PlanE[num_syns]; n_plan = num_syns;
+  for(int i = 0; i < num_syns; i++){
+    Syn *s = syns[i]; PlanE e = {s->gkind, s, NULL, NULL, s->strength, 0};
+    if(s->gkind){ e.R = shared_Rptr(s); e.E = shared_Eptr(s); e.erev = shared_erev(s); }
+    plan[i] = e;
+  }
+}

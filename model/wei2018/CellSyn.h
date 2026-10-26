@@ -92,6 +92,13 @@ class CellSyn{
 
  public:
 
+  // compact per-cell synapse plan (share_gates): one entry per synapse, in syns[] order, so the
+  // current is accumulated in exactly the original order.  Shared entries carry what their current
+  // needs (strength, reversal, pointers to the leader's gate) and never touch the Syn object.
+  struct PlanE { long kind; Syn *s; const double *R; const double *E; double str; double erev; };
+  PlanE *plan; int n_plan;
+  void build_plan();
+
   Syn **syns; //synapses
   int num_syns; // number of synapses
   drand48_data *rand_buffer;
@@ -122,6 +129,7 @@ class CellSyn{
     return my_rand;
   }
   double get_cur_time(){ return cur_time; }
+  int has_plan(){ return plan != NULL; }
   double get_tau(){ return tau; }
   int get_current_step(){ return current_step; }
   int get_flip(){
@@ -142,6 +150,7 @@ class CellSyn{
 
   //step - 1 for first step of runge-kutta 0 for all other steps
   void calc(double x, double *y_ini, double *f_ini, int step);
+  void calc_one_syn(Syn *sy, double x, double vd, int step, double &current, int &k);
   //create synapses and init base cell
   virtual void memory(Syn_Info **syn_info,int num_syns) = 0;
   //each type of neuron needs to define its own matrix of used Giant synapses

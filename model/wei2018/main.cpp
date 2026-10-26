@@ -110,6 +110,8 @@ static void build_shared_gates(){
     if(cells[hhns[h]]->get_cur_time() != cells[hhns[0]]->get_cur_time() || cells[hhns[h]]->get_tau() != cells[hhns[0]]->get_tau()){
       printf("share_gates: cells not in lockstep\n"); exit(1); }
   printf("share_gates 1: %ld synapses read %zu shared gates\n", n_members, gate_leads.size());
+  // the compact plan caches strengths: only valid while nothing rescales synapses at run time
+  if(homeo.boost == 0){ for(int h = 0; h < hhi; h++) cells[hhns[h]]->build_plan(); printf("share_gates: compact synapse plans built\n"); }
 }
 
 void runMP(int all){

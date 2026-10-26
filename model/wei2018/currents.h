@@ -517,6 +517,9 @@ class GAP:public Syn{
 double shared_I(Syn *s, double v);
 double shared_R(Syn *s);
 void shared_gate(Syn *s, double x, int y_post);
+const double *shared_Rptr(Syn *s);
+const double *shared_Eptr(Syn *s);
+double shared_erev(Syn *s);
 
 //Giant class represents all synapses of a particular type for a given neuron.
 class GiantSyn{
@@ -598,6 +601,9 @@ public:
  void gate(double x, int y_post);   // gate part of calc() only (shared gates)
  friend double shared_I(Syn *s, double v);
  friend double shared_R(Syn *s);
+ friend const double *shared_Rptr(Syn *s);
+ friend const double *shared_Eptr(Syn *s);
+ friend double shared_erev(Syn *s);
 }; 
 
 
@@ -671,6 +677,9 @@ public:
  void gate(double x, int y_post);   // gate part of calc() only (shared gates)
  friend double shared_I(Syn *s, double v);
  friend double shared_R(Syn *s);
+ friend const double *shared_Rptr(Syn *s);
+ friend const double *shared_Eptr(Syn *s);
+ friend double shared_erev(Syn *s);
 };
 
 
@@ -848,6 +857,9 @@ public:
  void gate(double x, int y_post);   // gate part of calc() only (shared gates)
  friend double shared_I(Syn *s, double v);
  friend double shared_R(Syn *s);
+ friend const double *shared_Rptr(Syn *s);
+ friend const double *shared_Eptr(Syn *s);
+ friend double shared_erev(Syn *s);
 };
 
 

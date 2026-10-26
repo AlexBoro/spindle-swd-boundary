@@ -1047,3 +1047,21 @@ void shared_gate(Syn *s, double x, int y_post){
     case 3: ((NMDA_D1*)s)->gate(x, y_post); return;
   }
 }
+
+const double *shared_Rptr(Syn *s){
+  switch(s->gkind){
+    case 1: return &((AMPA*)s->lead)->R;
+    case 2: return &((GABA_A*)s->lead)->R;
+    case 3: return &((NMDA_D1*)s->lead)->R;
+  }
+  return NULL;
+}
+const double *shared_Eptr(Syn *s){ return s->gkind == 3 ? &((NMDA_D1*)s->lead)->E : NULL; }
+double shared_erev(Syn *s){
+  switch(s->gkind){
+    case 1: return AMPA::E_AMPA;
+    case 2: return ((GABA_A*)s)->E_GABA;
+    case 3: return NMDA_D1::E_NMDA;
+  }
+  return 0;
+}
