@@ -1,0 +1,6 @@
+# SWD screen (Stage 3 tier 1): branch from the shared trained state at 212 s (checkpoint of a
+# fig3 run), then 70 s of n2 with no stimulus. Run with -ckpt_load_path <ck212> -plasticity_start 1e12.
+# tmax = 282000 ms
+state 0 212000 awake
+state 212000 282000 n2
+seq 1 5 200 205 210 215 220

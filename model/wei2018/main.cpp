@@ -9,6 +9,7 @@
 #include "protocol.h"
 #include <vector>
 #include "bmalgo.h"
+#include "checkpoint.h"
 
 int num_mp_threads; //number of openMP threads
 
@@ -410,7 +411,7 @@ void recorder_open(){
   if(weight_dt>0){ f_w=fopen((output_location+"weights_g.f32").c_str(),"wb");
                    f_mini=fopen((output_location+"weights_mini.f32").c_str(),"wb"); w_every=(int)(weight_dt/TAU+0.5); }
 }
-void recorder_initial_snapshot(){ recorder_step(-1, 0.0); }   // weights at t = 0
+void recorder_initial_snapshot(){ recorder_step(-1, t); }   // weights at t = 0
 
 // columns of lfp.f32: t, mean PY soma V, mean IN soma V, mean TC V, mean RE V
 void recorder_step(int ii, double t){
@@ -515,8 +516,6 @@ int main(int argc,char **argv){
   //------Main Loop--------
   printf("timer started");
   printf("\n starting main loop: time= %lf: end_time= %lf\n", t,tmax);
-  int print_count = 0;
-  int ii = 0;
   int i=0;
   hhns=new int[num_cells];
   for(i=0; i<num_cells; i++){
@@ -538,6 +537,12 @@ int main(int argc,char **argv){
   FILE *fproto = fopen((output_location+"protocol_used.txt").c_str(), "w");
   protocol.dump(fproto); fclose(fproto);
   fmanipulations = fopen((output_location+"manipulation.txt").c_str(),"w");
+  int print_count = 0;
+  int ii = 0;
+  if(!ckpt_load_path.empty()) ckpt_load(ckpt_load_path, t, ii, print_count);   // checkpoint.h
+  if(ckpt_save_at >= 0 && ckpt_save_path.empty()){ fprintf(stderr, "ckpt_save_at needs ckpt_save_path\n"); exit(2); }
+  int ckpt_done = 0;
+
   recorder_open();
   recorder_initial_snapshot();
   area_open();
@@ -545,6 +550,10 @@ int main(int argc,char **argv){
   print_connectivity(cell_sizes);
 
   while( t < tmax){
+    if(ckpt_save_at >= 0 && !ckpt_done && t >= ckpt_save_at - TAU/2){
+      ckpt_save(ckpt_save_path, t, ii, print_count); ckpt_done = 1;
+      if(ckpt_exit_after_save) break;
+    }
     total_rec = 0;
 
     // vigilance state, STDP gate and training flag for this step (protocol.h)

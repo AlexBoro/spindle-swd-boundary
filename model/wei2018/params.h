@@ -56,6 +56,14 @@ assert(int_count!=MAX_PARAMS);\
 int_pars[int_count]=&par;\
 int_par_name[int_count++]=#par; 
 
+string *string_pars[MAX_PARAMS];
+string string_par_name[MAX_PARAMS];
+int string_count=0;
+#define add_string_param(par) \
+assert(string_count!=MAX_PARAMS);\
+string_pars[string_count]=&par;\
+string_par_name[string_count++]=#par; 
+
 //parse one parameter on the given config line; returns 1 if line format is recognized
 //result is put directly into global parameter
 int parse_param(string line){
@@ -79,6 +87,12 @@ int parse_param(string line){
   for (i=0; i<int_count; i++) //integer parameters
     if (par1==int_par_name[i]){
       if (!(stringstream(par2)>>*(int_pars[i]))) return 0;
+      return 1;
+    }
+
+  for (i=0; i<string_count; i++) //string parameters (no whitespace)
+    if (par1==string_par_name[i]){
+      *(string_pars[i])=par2;
       return 1;
     }
 
@@ -121,6 +135,9 @@ void print_parameters(){
 
   for (int i=0; i<double_count;i++)
     fprintf(stderr,"%s:\t%lf\n",double_par_name[i].c_str(),*(double_pars[i]));
+
+  for (int i=0; i<string_count;i++)
+    fprintf(stderr,"%s:\t%s\n",string_par_name[i].c_str(),string_pars[i]->c_str());
 }//print_parameters
 
 #endif

@@ -12,6 +12,10 @@ usage: python job_run.py <src.tar.gz> <protocol_name> <seed> <threads> [extra -p
 Raw outputs: spike_time (text 't type m n'), lfp.f32 (t, mean V PY/IN/TC/RE),
 weights_g.f32 / weights_mini.f32 (t, then one value per PY-PY AMPA_D3 synapse),
 weights_index.txt (pre post).
+
+Checkpoints (model/wei2018/checkpoint.h): pass "-ckpt_save_at T -ckpt_save_path NAME" to write the
+full state at t = T into out/<run_id>_NAME (persisted with the run); add "-ckpt_exit_after_save 1" to
+stop there. Pass "-ckpt_load_path FILE" to branch from a saved state; its sha256 goes into the json.
 """
 import hashlib, json, os, re, subprocess, sys, tarfile, time
 import numpy as np
@@ -65,6 +69,13 @@ args = ["-sim_seed", str(seed), "-num_mp_threads", str(threads)]
 if tmax is not None and "-tmax" not in extra:
     args += ["-tmax", str(tmax)]
 args += extra
+ckpt_name = None
+if "-ckpt_save_path" in args:          # write the checkpoint next to the raw output, keep the name for out/
+    k = args.index("-ckpt_save_path") + 1; ckpt_name = os.path.basename(args[k])
+    args = args[:k] + [os.path.join(os.path.abspath("raw"), ckpt_name)] + args[k + 1:]
+if "-ckpt_load_path" in args:
+    cp = args[args.index("-ckpt_load_path") + 1]
+    meta["ckpt_load_sha256"] = hashlib.sha256(open(cp, "rb").read()).hexdigest()
 meta["args"] = args
 tag = " ".join(extra + cfg_over)
 run_id = f"{proto}_s{seed}" + ("_" + hashlib.sha1(tag.encode()).hexdigest()[:6] if tag else "")
@@ -110,6 +121,12 @@ for nm in ["g", "mini"]:
 d["protocol_used"] = np.array(open(os.path.join(raw, "protocol_used.txt")).read())
 np.savez_compressed(os.path.join("out", run_id + ".npz"), **d)
 meta["n_spikes"] = int(len(sp))
+for l in log.splitlines():
+    if l.startswith(("CKPT_SAVED", "CKPT_LOADED", "CKPT_PARAM_OVERRIDE")): meta.setdefault("ckpt_log", []).append(l)
+if ckpt_name:
+    import shutil
+    shutil.copy2(os.path.join(raw, ckpt_name), os.path.join("out", run_id + "_" + ckpt_name))
+    meta["ckpt_saved_sha256"] = hashlib.sha256(open(os.path.join(raw, ckpt_name), "rb").read()).hexdigest()
 meta["run_id"] = run_id
 json.dump(meta, open(os.path.join("out", run_id + ".json"), "w"), indent=1)
 for f in ["sim_stdout.log", "sim_stderr.log"]:

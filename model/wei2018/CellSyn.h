@@ -66,6 +66,7 @@ typedef struct{
 //abtract class for the combination of a cell and its synapsis
 //7 classes derive from it. 
 class CellSyn{
+  friend struct Ckpt;   // checkpoint.cpp
 
  protected:
   int lhs_size; // how big y,yk,f and s are
