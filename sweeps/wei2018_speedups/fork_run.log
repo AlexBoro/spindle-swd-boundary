@@ -1,0 +1,5 @@
+PARENT RC 0 wall_s 41151
+DONE fig3_awake_s0 completed True spikes 295778 child_wall_s 41151
+DONE fig3_n2_s0 completed True spikes 745763 child_wall_s 39482
+DONE fig3_n3_s0 completed True spikes 1838165 child_wall_s 37268
+DONE fig3_n2n3_s0 completed True spikes 1323577 child_wall_s 40493

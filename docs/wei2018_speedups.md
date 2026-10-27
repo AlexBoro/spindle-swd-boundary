@@ -38,9 +38,26 @@ one thread.
 | Fork at 3 s into `devcheck` + `devcheck_b` (N2/N3 order swapped) | child `devcheck` = original run; child `devcheck_b` = unforked run of `devcheck_b` |
 | Thread efficiency | at 2 threads one run uses 1.5× fewer core-seconds than at 6 threads, so pack runs (or fork children) at 1–2 threads each |
 
-Pending: a full-length check against the original Modal Fig 3 runs on Runpod (`rp/validate.sh`).
-It forks at 212 s into awake, N2, N3 and N2+N3, and compares each child's complete 562 s output
-with the Modal run's fingerprint.
+### Full-length validation on Runpod (2026-10-27, `sweeps/wei2018_speedups/`)
+
+The Pod was Compute-Optimized, 8 vCPU (4 AMD EPYC 9655P cores × 2 hyperthreads), with g++ 9.4.
+Fig 3 seed 0 was simulated once to 212 s on 8 threads, then forked into awake, N2, N3 and N2+N3,
+each continuing on 2 threads to 562 s. Each child's complete output (spikes, LFP, weight and mini
+snapshots) was compared with the original Modal run (g++ 12.2, unoptimised code) at 212 s and at
+562 s: **all 8 comparisons identical**.
+
+| Measure on this Pod | Value |
+|---|---|
+| Original vs optimised code, fig3_n2 first 10 s, 8 threads | 369.9 s vs 314.5 s: **only 1.18×**, against 3.5× on the local PC |
+| Shared prefix 0–212 s, 8 threads | 6,821 s (32.2 s per model-s) |
+| Four forked children, 2 threads each, 212–562 s | 87–98 s per model-s per child (≈ 24 Pod-s per model-s in total) |
+| Whole job | ≈ 11.7 h ≈ $2.85, i.e. ≈ $0.71 per Fig 3 condition |
+
+The optimisations gain far less on this server CPU than on the local PC, which runs the original
+code about 4× slower. The local PC is probably memory-bound, and the big caches of the server
+processor already hide most of the memory traffic the changes remove. On Runpod the saving comes
+mostly from checkpoint/fork (1,612 instead of 2,248 model-seconds for Fig 3) and from packing runs at
+2 threads each.
 
 ## Using it
 
