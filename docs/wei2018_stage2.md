@@ -47,7 +47,8 @@ Paired t-tests over seeds, n = 5. D1 details: `wei2018_stage2_d1.md`.
 ## Other candidates
 
 - **D3 (literal routing of the "AMPA from TC" factor onto TC→PY/IN):** cortex overdriven (PY 7.4 Hz in N2). Rejected.
-- **D4 (thalamic loop strength, Ih shift) for the spindle-frequency offset:** no variant gave clean 7–14 Hz spindles; weaker RE→TC GABA gave a 4 Hz thalamic rhythm and a −4 mV Ih shift silenced the thalamus. Kept the paper's values; both are noted as levers for the SWD phase.
+- **D4 (thalamic loop strength, Ih shift) for the spindle-frequency offset:** no valid variant gave clean 7–14 Hz spindles. Making `gh_tc_n2` more negative (−3, −4 mV) shifts Ih activation to depolarised voltages, i.e. *more* Ih, and progressively silenced the thalamus. Kept the paper's values.
+  - **Correction (2026-10-27): the "Krishnan-level RE→TC GABA" gate run (v3) is invalid.** Its overrides were written in µS (0.0439, 0.00176) into `network.cfg`, which is in mS (paper value 0.00006), so RE→TC GABA_A and GABA_B were about 730× and 700× *stronger*, not 1.4× weaker. Several TC cells went to NaN from t = 9 ms (mean TC voltage is NaN throughout). The 4.2 Hz "thalamic rhythm" previously reported here came from that run and is withdrawn. The intended test (×0.73 GABA_A, ×0.70 GABA_B, i.e. 0.0000439 / 0.00000176) has not been run.
 - **D5 (1 s vs 3 s test spacing):** explained by post-response network quiescence, not synaptic depression (one seed).
 
 ## Compute
