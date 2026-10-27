@@ -15,6 +15,7 @@ in-process fork, built in a parallel session), so both ways of branching are ava
 | `ckpt-opt` reference run vs original code | bit-identical |
 | Branch with RE→TC GABA_A and GABA_B ×0.5 (1,628 + 1,628 synapses) and a changed `gaba_cx_awake`, `ckpt-opt` vs original code | bit-identical, so the compact synapse plans pick up overridden strengths |
 | Runs without checkpoint flags vs previous binary | byte-identical |
+| **Production network (Modal, original code, seed 0):** save at 212 s, restore, run to 232 s, vs the stored uninterrupted D1 `fig3_n2_s0` run | all 41,112 spikes and 20,000 LFP rows in 212–232 s bit-identical |
 
 Branching semantics: state-table parameters (`gh_tc_*`, `gaba_cx_*`, `gkl_*`, …) and STDP factors take
 effect immediately; synapse `strength`, `mini_s` and `mini_fre` come from the fresh build, so
@@ -62,5 +63,4 @@ Runpod pod, or ~$20 on Modal Sandboxes, plus ~$1 for the three 212 s checkpoints
 - Waiting for the parallel session's full-length Runpod validation of `opt-exact` (the user chose to
   consolidate on it). Then: write the three 212 s checkpoints with `ckpt-opt`, validate one restore
   against the stored Modal `fig3_n2` run, and launch tier 1.
-- A main-binary checkpoint job (seed 0, Modal) is also validating the mechanism on the production
-  network against the stored D1 `fig3_n2_s0` run.
+- Production-network validation of the checkpoint (original code, seed 0): passed (table above).
