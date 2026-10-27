@@ -1,7 +1,7 @@
 all: mindcurrent
 
-mindcurrent: main.cpp CellSyn.cpp CellSyn.h currents.cpp currents.h io.cpp io.h network.h network.cpp bmalgo.h bmalgo.cpp protocol.h protocol.cpp
-	g++ -g -O3 -lm -Wall -fopenmp  main.cpp CellSyn.cpp io.cpp currents.cpp network.cpp bmalgo.cpp protocol.cpp fork.cpp -o mindcurrent
+mindcurrent: main.cpp CellSyn.cpp CellSyn.h currents.cpp currents.h io.cpp io.h network.h network.cpp bmalgo.h bmalgo.cpp protocol.h protocol.cpp fork.h fork.cpp checkpoint.h checkpoint.cpp
+	g++ -g -O3 -lm -Wall -fopenmp  main.cpp CellSyn.cpp io.cpp currents.cpp network.cpp bmalgo.cpp protocol.cpp fork.cpp checkpoint.cpp -o mindcurrent
 phi:
 	icpc -mmic -O3 -Wall -fopenmp main.cpp CellSyn.cpp io.cpp currents.cpp network.cpp -o mindcurrent
 

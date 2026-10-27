@@ -1,6 +1,7 @@
 #include "io.h"
 #include <sstream>
 #include "params.h"
+#include "checkpoint.h"
 #include "protocol.h"
 #include "fork.h"
 #include <string.h>
@@ -68,6 +69,9 @@ void load_input_params(
   add_double_param(ampa_th_awake); add_double_param(ampa_th_n2); add_double_param(ampa_th_n3);
   add_double_param(gaba_cx_awake); add_double_param(gaba_cx_n2); add_double_param(gaba_cx_n3);
   add_double_param(gaba_th_awake); add_double_param(gaba_th_n2); add_double_param(gaba_th_n3);
+
+  add_double_param(ckpt_save_at); add_int_param(ckpt_exit_after_save);
+  add_string_param(ckpt_save_path); add_string_param(ckpt_load_path);
 
   add_double_param(input_strength);
   add_double_param(input_start_neuron);

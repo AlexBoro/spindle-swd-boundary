@@ -720,6 +720,7 @@ public:
 
 //--first order kiner model for AMPA synapse WITH depression & spont releases------
 class AMPA_D2:public Syn {
+  friend struct Ckpt;   // checkpoint.cpp
  static double E_AMPA;
  static double Cdur, Cmax, Deadtime, Prethresh, Cdel; 
  static double Alpha, Beta; 
@@ -775,6 +776,7 @@ public:
 //--------------------D3-------------
 //--first order kiner model for AMPA synapce WITH depression & spont releases & Learning------                                                                                 
 class AMPA_D3:public Syn {
+  friend struct Ckpt;   // checkpoint.cpp
 
   static double E_AMPA;
   static double Cdur, Cmax, Deadtime, Prethresh, Prethresh1, Cdel;
@@ -883,6 +885,7 @@ public:
 
 //---first order kinet model for GABA-A synapse with DEPRESSION & spont IPSPs--
 class GABA_A_D2 :public Syn{
+  friend struct Ckpt;   // checkpoint.cpp
  static double Cdur, Cmax, Deadtime, Prethresh; 
  static double Alpha, Beta;  
  double R, C, R0, R1;
