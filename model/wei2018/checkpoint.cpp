@@ -17,6 +17,7 @@ std::string ckpt_save_path = "", ckpt_load_path = "";
 extern CellSyn **cells;
 extern int num_cells;
 extern Homeostasis homeo;
+extern int share_gates;
 
 static const char MAGIC[8] = {'W', 'E', 'I', 'C', 'K', 'P', 'T', '1'};
 
@@ -124,6 +125,17 @@ struct Ckpt {
     char m[8]; memcpy(m, MAGIC, 8); raw(m, 8);
     if (memcmp(m, MAGIC, 8) != 0) die("bad magic");
     check(num_cells, "num_cells"); check(sim_seed, "sim_seed");
+    // With shared gates only leader synapses carry live gate state, so the gate layout must match
+    // between save and load (handoff note, section 2): same switch, same leader and member counts.
+    long n_lead = 0, n_member = 0;
+    for (int i = 0; i < num_cells; i++)
+      for (int k = 0; k < cells[i]->num_syns; k++) {
+        Syn *y = cells[i]->syns[k];
+        if (y->gkind) { n_member++; if (y->lead == y) n_lead++; }
+      }
+    check(share_gates, "share_gates (save and load must agree)");
+    check(n_lead, "shared-gate leader count"); check(n_member, "shared-gate member count");
+    check(homeo.boost, "homeo_boost (compact plans cache strengths)");
     io(t); io(ii); io(print_count);
     homeostasis();
     for (int i = 0; i < num_cells; i++) cell(cells[i]);

@@ -13,6 +13,8 @@
 //    built value (so network.cfg overrides apply) and reports how many differ from the file.
 //    Exception: AMPA_D3 'mini_s' is plastic and is restored. Synapses cache strength*E in g1
 //    at each release, so a changed strength takes effect at that synapse's next release;
+//  * the header records share_gates and the shared-gate leader/member counts (1,200 / 28,776 for the
+//    production network) and refuses a mismatch, because followers do not carry live gate state;
 //  * shared-gate leaders (opt-exact) live inside Syn objects and are restored with them; the
 //    lead pointers and the per-cell synapse plans (which cache only parameters) are those of the
 //    fresh build, so the plan picks up overridden strengths automatically;
