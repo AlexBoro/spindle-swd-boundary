@@ -5,7 +5,10 @@ band; this network has no EEG, only spikes and mean soma voltages. This screen t
 the cortical population spike train and asks, window by window, whether the cortex shows the
 signature of absence-type SWDs in thalamocortical models:
 
-  * a dominant population rhythm at 2-5.5 Hz (spindles are 6-14 Hz, the N3 slow oscillation < 1.5 Hz);
+  * a dominant population rhythm at 2-5.5 Hz (human absence SWDs; spindles are 6-14 Hz, the N3 slow
+    oscillation < 1.5 Hz), or, reported separately, at 7-11 Hz (rodent genetic absence models). The
+    rodent band overlaps the spindle band, so rodent-band hits must be checked against the unperturbed
+    N2 baseline and by eye before they are called SWDs;
   * that rhythm concentrated in a narrow band (regular cycles), not broadband;
   * hypersynchrony: a large fraction of PY cells fires in each cycle;
   * cycle-to-cycle regularity (low CV of inter-burst intervals).
@@ -22,7 +25,9 @@ PY, IN, TC, RE = 4, 7, 2, 0          # spk_type codes
 N_PY = 500
 BIN_MS = 5.0
 WIN_S, STEP_S = 2.0, 0.25
-F_LO, F_HI = 2.0, 5.5                 # SWD band
+F_LO, F_HI = 2.0, 5.5                 # SWD band (human absence seizures, ~3 Hz)
+BANDS = {"human": (2.0, 5.5),         # reported side by side; "swd" / episodes keep the human band
+         "rodent": (7.0, 11.0)}       # GAERS / WAG-Rij genetic absence models, ~7-11 Hz
 Q_MIN = 0.35                          # power in f0 +- 0.5 Hz / power 0.5-20 Hz
 PART_MIN = 0.30                       # median fraction of PY cells firing per cycle
 CV_MAX = 0.25                         # CV of inter-burst intervals within the window
@@ -66,16 +71,20 @@ def window_features(t_ms, m, t0, t1):
         ibi = np.diff(tp[kk])
         cv = ibi.std() / ibi.mean() if len(ibi) >= 3 else np.inf
         pm = float(np.median(part[kk])) if kk.any() else 0.0
-        ok = (F_LO <= f0 <= F_HI) and q >= Q_MIN and pm >= PART_MIN and cv <= CV_MAX
-        rows.append(dict(t0=ws, t1=we, f0=f0, q=q, spindle_frac=pspin, part=pm, cv=cv,
-                         n_bursts=int(kk.sum()), rate=r[a:a + nw].sum() / N_PY / WIN_S, swd=ok))
+        rest = q >= Q_MIN and pm >= PART_MIN and cv <= CV_MAX       # criteria (ii)-(iv), band-independent
+        row = dict(t0=ws, t1=we, f0=f0, q=q, spindle_frac=pspin, part=pm, cv=cv,
+                   n_bursts=int(kk.sum()), rate=r[a:a + nw].sum() / N_PY / WIN_S)
+        for b, (lo, hi) in BANDS.items():
+            row[f"swd_{b}"] = bool(lo <= f0 <= hi and rest)
+        row["swd"] = row["swd_human"]
+        rows.append(row)
     return rows
 
 
-def episodes(rows, min_s=MIN_EP_S):
+def episodes(rows, min_s=MIN_EP_S, key="swd"):
     eps, cur = [], None
     for w in rows:
-        if w["swd"]:
+        if w[key]:
             if cur and w["t0"] <= cur[1]: cur[1] = w["t1"]
             else:
                 if cur: eps.append(cur)
@@ -101,4 +110,12 @@ def screen(d, t0, t1):
                max_part=float(max([w["part"] for w in rows], default=0)),
                rate_PY=rate(PY), rate_IN=rate(IN), rate_TC=rate(TC), rate_RE=rate(RE),
                lfp_finite=bool(np.isfinite(d["lfp"][(d["lfp"][:, 0] >= t0) & (d["lfp"][:, 0] < t1), 1:]).all()))
+    T = (t1 - t0) / 1000
+    for b in BANDS:                       # per-band episode summary (human duplicates the legacy columns)
+        e = episodes(rows, key=f"swd_{b}")
+        out[f"n_episodes_{b}"] = len(e)
+        out[f"swd_s_{b}"] = sum(y - x for x, y in e) / 1000
+        out[f"swd_time_frac_{b}"] = out[f"swd_s_{b}"] / T
+        out[f"frac_windows_{b}"] = float(np.mean([w[f"swd_{b}"] for w in rows])) if rows else 0.0
+        out[f"episodes_{b}"] = e
     return out, rows, eps
