@@ -110,6 +110,7 @@ class CellSyn{
   int flip; // if cell is spiking
   int flip_for_maps; // check if the cell is spiking for maps
   double old_v; // voltage before last calc of cell
+  double eeg_syn; // diagnostic only: total synaptic current into the cell at its last calc (-sum I_syn; + = inward), read by the rec_eeg recorder
   int type; // type of this cell
   int num_spikes; // how many spikes this window
   int ismap; // map or not

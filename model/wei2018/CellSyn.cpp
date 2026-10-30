@@ -2,7 +2,8 @@
 
 
 CellSyn::CellSyn(int i,int j,int b_size,int t_size,Cell_Info *cell_info,int type){
-  plan = NULL; n_plan = 0;    
+  plan = NULL; n_plan = 0;
+  eeg_syn = 0;    
 
   rand_buffer = new drand48_data;
   srand48_r(2000,rand_buffer);
@@ -346,9 +347,12 @@ void CellSyn::calc(double x, double *y_ini, double *f_ini, int step){
 
   // training / test stimulation from the protocol file (donor: hard-coded
   // if-chains for three sequences).  Applied to PY (E_CX) cells only, as in donor.
+  double syn0 = current;            // synaptic sum before stimulation (diagnostic copy; current is unchanged)
   if (this->cell_type == E_CX)
     current = current + protocol.stim(this->m, x);
-  current =  current - calc_GiantSyns();
+  double giant = calc_GiantSyns();
+  current =  current - giant;
+  eeg_syn = syn0 - giant;
   base_cell->calc(x, current, y_ini, f_ini);
 
 }

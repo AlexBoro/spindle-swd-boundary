@@ -533,7 +533,59 @@ void area_step(int ii, double t){
   fwrite(row, sizeof(float), 15, f_area);
 }
 
-void recorder_close(){ if(f_area)fclose(f_area); if(f_lfp)fclose(f_lfp); if(f_w)fclose(f_w); if(f_mini)fclose(f_mini); }
+// ---- optional EEG-source recorder (rec_eeg 1): one row per LFP sample (1 ms) ----
+// The PY cells are split by chain index m into EEG_NB blocks of consecutive cells. Per block:
+//   ax  = sum of dendro-somatic axial current (v_SOMA - v_DEND)/kappa in uA (+ = soma -> dendrite inside
+//         the cell); times the soma-dendrite separation this is the block's current dipole moment;
+//   syn = sum of total synaptic current into the dendrite, -sum(I_syn) (+ = inward / depolarising);
+//   gab = sum of I of the IN->PY GABA_A_D2 synapses (+ = outward), so excitatory = syn + gab.
+// Then IN totals (ax, syn). cols: t, NB x (ax, syn, gab), IN ax, IN syn  -> 1 + 3*NB + 2 floats.
+// Values are those of each cell's last calc() of the step. Read-only: no model state is changed.
+static const int EEG_NB = 25;
+static FILE *f_eeg = NULL;
+static std::vector<int> eeg_py, eeg_blk, eeg_in;
+static std::vector<std::vector<GABA_A_D2*> > eeg_gaba;
+void eeg_open(){
+  if(!rec_eeg) return;
+  int npy = 0; for(int i = 0; i < num_cells; i++) if(cells[i]->type == E_CX) npy++;
+  int ng = 0, ngiant = 0;
+  for(int i = 0; i < num_cells; i++){
+    if(cells[i]->type == E_CX){
+      eeg_py.push_back(i); eeg_blk.push_back(cells[i]->m * EEG_NB / npy);
+      std::vector<GABA_A_D2*> g;
+      for(int k = 0; k < cells[i]->num_syns; k++){
+        Syn *s = cells[i]->syns[k];
+        if(s->type == E_GABA_A_D2){ if(s->giant) ngiant++; else { g.push_back((GABA_A_D2*)s); ng++; } }
+      }
+      eeg_gaba.push_back(g);
+    }
+    if(cells[i]->type == E_IN) eeg_in.push_back(i);
+  }
+  FILE *fi = fopen((output_location + "eeg_info.txt").c_str(), "w");
+  fprintf(fi, "nb %d\nnpy %d\nnin %zu\ngaba_syn %d\ngaba_giant %d\ncols %d\n", EEG_NB, npy, eeg_in.size(), ng, ngiant, 1 + 3*EEG_NB + 2);
+  fclose(fi);
+  printf("rec_eeg: %d PY in %d blocks, %zu IN, %d GABA_A_D2 synapses (%d giant, excluded)\n", npy, EEG_NB, eeg_in.size(), ng, ngiant);
+  f_eeg = out_fopen(output_location + "eeg.f32", "wb");
+}
+void eeg_step(int ii, double t){
+  if(!f_eeg || lfp_every <= 0 || ii < 0 || ii % lfp_every) return;
+  double ax[EEG_NB] = {0}, sy[EEG_NB] = {0}, ga[EEG_NB] = {0}, inax = 0, insy = 0;
+  for(size_t k = 0; k < eeg_py.size(); k++){
+    CellSyn *c = cells[eeg_py[k]]; CX *b = (CX*)c->base_cell; int bl = eeg_blk[k];
+    ax[bl] += b->axil_current * b->S_CX_DEND; sy[bl] += c->eeg_syn;
+    for(size_t q = 0; q < eeg_gaba[k].size(); q++) ga[bl] += eeg_gaba[k][q]->I;
+  }
+  for(size_t k = 0; k < eeg_in.size(); k++){
+    CellSyn *c = cells[eeg_in[k]]; CX *b = (CX*)c->base_cell;
+    inax += b->axil_current * b->S_CX_DEND; insy += c->eeg_syn;
+  }
+  float row[1 + 3*EEG_NB + 2]; int n = 0; row[n++] = (float)(t + TAU);
+  for(int bl = 0; bl < EEG_NB; bl++){ row[n++] = (float)ax[bl]; row[n++] = (float)sy[bl]; row[n++] = (float)ga[bl]; }
+  row[n++] = (float)inax; row[n++] = (float)insy;
+  fwrite(row, sizeof(float), n, f_eeg);
+}
+
+void recorder_close(){ if(f_eeg)fclose(f_eeg); if(f_area)fclose(f_area); if(f_lfp)fclose(f_lfp); if(f_w)fclose(f_w); if(f_mini)fclose(f_mini); }
 
 //+++++++++++++++++++ MAIN PROGRAM +++++++++++++++++++++++++++++++++++++++++++
 int main(int argc,char **argv){
@@ -594,6 +646,7 @@ int main(int argc,char **argv){
   recorder_open();
   recorder_initial_snapshot();
   area_open();
+  eeg_open();
 
   print_connectivity(cell_sizes);
 
@@ -671,6 +724,7 @@ int main(int argc,char **argv){
 
     recorder_step(ii, t);
     area_step(ii, t);
+    eeg_step(ii, t);
     t = t + TAU; //increase time
   } //end while loop
 

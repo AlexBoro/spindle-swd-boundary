@@ -138,6 +138,7 @@ double lfp_dt = 1;
 int weight_jitter = 1;
 int tc_ampa_route = 0;
 int rec_area = 0;
+int rec_eeg = 0;                  // 1 = write eeg.f32 (PY dipole / synaptic currents by block, 1 ms)
 
 extern double fac_gkl, fac_gkl_TC, fac_gkl_RE, fac_gh_TC, fac_AMPA_D2, fac_AMPA_TC,
   fac_GABA_D2, fac_GABA_TC, fac_gkca_cx, fac_gkm_cx, fac_gkv_cx;

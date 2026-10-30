@@ -112,6 +112,11 @@ d["lfp"] = lfp[: len(lfp) // 5 * 5].reshape(-1, 5)
 ra = os.path.join(raw, "rec_area.f32")
 if os.path.exists(ra):   # -rec_area 1: t + 2 regions x 7 trained-area state columns (see main.cpp area_step)
     a = np.fromfile(ra, dtype=np.float32); d["rec_area"] = a[: len(a) // 15 * 15].reshape(-1, 15)
+ef = os.path.join(raw, "eeg.f32")
+if os.path.exists(ef):   # -rec_eeg 1: t + NB PY blocks x (axial, synaptic, GABA_A) + IN (axial, synaptic); see main.cpp eeg_open
+    info = dict(l.split() for l in open(os.path.join(raw, "eeg_info.txt")))
+    nc = int(info["cols"]); a = np.fromfile(ef, dtype=np.float32); d["eeg"] = a[: len(a) // nc * nc].reshape(-1, nc)
+    d["eeg_info"] = np.array(json.dumps(info))
 idx = np.loadtxt(os.path.join(raw, "weights_index.txt"), dtype=np.int32, ndmin=2)
 d["w_pre"], d["w_post"] = idx[:, 0], idx[:, 1]
 n = len(idx) + 1
