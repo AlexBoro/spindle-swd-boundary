@@ -20,8 +20,10 @@ The model writes, every 1 ms, for each of NB blocks of consecutive PY cells alon
 
 Units are arbitrary (cell spacing and dipole length are not specified by the model); traces are
 compared after z-scoring. Geometry defaults: 20 um per PY cell along the chain (10 mm for 500
-cells), electrodes 2 mm above the dendritic layer. A 40 Hz zero-phase low-pass is applied, as in
-the Dervinis-Crunelli EEG forward model (analysis/eeg.py).
+cells), electrodes 2 mm above the dendritic layer. A 40 Hz low-pass is applied (4th-order Butterworth,
+zero-phase). The 40 Hz cut-off follows readDataThCx_EEG.m in the vendored Dervinis & Crunelli
+thalamocortical2 model (model/thalamocortical2/, ported in analysis/eeg.py), whose own filter design
+differs (Wp 40 Hz, Rp 0.5 dB, Rs 10 dB at 60 Hz).
 """
 import json
 import numpy as np
